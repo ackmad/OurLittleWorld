@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Our Little World 🌸</title>
+  <meta name="description" content="Rumah digital Elfan & Savira — selalu hidup, selalu hangat." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Quicksand:wght@400;600;700&display=swap"
+    rel="stylesheet" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --cream: #fef9f0;
+      --sage: #7a9e7e;
+      --sage-dark: #4a7c59;
+      --peach: #f4a261;
+      --peach-light: #fcd5b5;
+      --blush: #f2c4ce;
+      --lavender: #c9b8e8;
+      --sky-blue: #a8d8ea;
+      --warm-gold: #f6c90e;
+      --brown: #8b5e3c;
+      --text-dark: #3d2b1f;
+      --text-mid: #6b4f3a;
+      --shadow: rgba(61, 43, 31, 0.15);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1028;
+      font-family: 'Nunito', sans-serif;
+      color: var(--text-dark);
+      cursor: none;
+      /* custom star cursor */
+    }
+
+    /* Star cursor */
+    #star-cursor {
+      position: fixed;
+      pointer-events: none;
+      z-index: 99999;
+      width: 32px;
+      height: 32px;
+      transform: translate(-50%, -50%);
+      filter: drop-shadow(0 0 8px rgba(255, 235, 59, 0.8));
+      transition: transform 0.05s linear;
+      user-select: none;
+    }
+
+    #star-cursor svg {
+      width: 100%;
+      height: 100%;
+      fill: #fff59d;
+    }
+
+    /* Renderer canvas */
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+
+    /* ─── Loading Screen ─────────────────────────────────── */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: linear-gradient(160deg, #1a1028 0%, #2d1b4e 50%, #1a2a4a 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 0.8s ease;
+    }
+
+    #loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-house {
+      font-size: 80px;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-12px);
+      }
+    }
+
+    .smoke-container {
+      display: flex;
+      gap: 6px;
+      height: 30px;
+      align-items: flex-end;
+      margin-top: -20px;
+    }
+
+    .smoke {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.5);
+      animation: smokeRise 1.5s ease-in infinite;
+    }
+
+    .smoke:nth-child(2) {
+      animation-delay: 0.3s;
+    }
+
+    .smoke:nth-child(3) {
+      animation-delay: 0.6s;
+    }
+
+    @keyframes smokeRise {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 0.6;
+      }
+
+      100% {
+        transform: translateY(-28px) scale(2.5);
+        opacity: 0;
+      }
+    }
+
+    .loading-title {
+      font-family: 'Quicksand', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #fef9f0;
+      text-shadow: 0 0 30px rgba(244, 162, 97, 0.6);
+      letter-spacing: 2px;
+    }
+
+    .loading-sub {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.55);
+      font-style: italic;
+    }
+
+    .loading-bar-wrap {
+      width: 200px;
+      height: 6px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.15);
+      overflow: hidden;
+    }
+
+    .loading-bar {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--peach), var(--blush));
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* ─── Join Screen ─────────────────────────────────────── */
+    #join-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 900;
+      background: linear-gradient(160deg, #c9e8f5 0%, #e8f5c9 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      display: none;
+    }
+
+    .join-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      border-radius: 28px;
+      padding: 48px 44px;
+      width: 380px;
+      box-shadow: 0 20px 60px var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: center;
+      animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .join-title {
+      font-size: 1.9rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      text-align: center;
+    }
+
+    .join-sub {
+      font-size: 0.9rem;
+      color: var(--text-mid);
+      text-align: center;
+      margin-top: -10px;
+    }
+
+    .join-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .join-field label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-mid);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .join-field input {
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 2px solid rgba(122, 158, 126, 0.4);
+      background: rgba(255, 255, 255, 0.9);
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      color: var(--text-dark);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .join-field input:focus {
+      border-color: var(--sage);
+      box-shadow: 0 0 0 3px rgba(122, 158, 126, 0.2);
+    }
+
+    .color-picker-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .color-dot {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+
+    .color-dot:hover {
+      transform: scale(1.15);
+    }
+
+    .color-dot.active {
+      border-color: var(--text-dark);
+      transform: scale(1.2);
+    }
+
+    .join-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .join-divider span {
+      font-size: 0.8rem;
+      color: var(--text-mid);
+      white-space: nowrap;
+    }
+
+    .join-divider::before,
+    .join-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(106, 79, 58, 0.2);
+    }
+
+    .btn {
+      padding: 14px 28px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'Nunito', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--sage), var(--sage-dark));
+      color: white;
+      box-shadow: 0 4px 14px rgba(74, 124, 89, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(74, 124, 89, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(122, 158, 126, 0.12);
+      color: var(--sage-dark);
+      border: 2px solid rgba(122, 158, 126, 0.3);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(122, 158, 126, 0.22);
+    }
+
+    .error-msg {
+      font-size: 0.85rem;
+      color: #c0392b;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    /* ─── HUD ─────────────────────────────────────────────── */
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* Interact prompt */
+    #interact-prompt {
+      position: absolute;
+      bottom: 28%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 8px 20px;
+      border-radius: 99px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-dark);
+      border: 2px solid rgba(122, 158, 126, 0.4);
+      display: none;
+      pointer-events: none;
+      animation: fadeInUp 0.2s ease;
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    #interact-prompt .key-badge {
+      display: inline-block;
+      background: var(--sage);
+      color: white;
+      border-radius: 6px;
+      padding: 2px 8px;
+      margin-right: 6px;
+      font-size: 0.8rem;
+    }
+
+    /* Notifications */
+    #notifications {
+      position: absolute;
+      bottom: 24px;
+      left: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .notif {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(10px);
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      color: var(--text-dark);
+      border-left: 3px solid var(--sage);
+      box-shadow: 0 4px 14px var(--shadow);
+      animation: notifIn 0.3s ease;
+      max-width: 280px;
+    }
+
+    @keyframes notifIn {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Room code display */
+    #room-info {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(10px);
+      padding: 6px 18px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-mid);
+      letter-spacing: 1px;
+      pointer-events: none;
+    }
+
+    /* Mute button */
+    #mute-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(10px);
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, background 0.2s;
+      pointer-events: all;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    #mute-btn:hover {
+      transform: scale(1.1);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Mini menu (Esc) */
+    #mini-menu {
+      position: fixed;
+      inset: 0;
+      z-index: 800;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 16, 40, 0.5);
+      backdrop-filter: blur(8px);
+    }
+
+    #mini-menu.open {
+      display: flex;
+    }
+
+    .mini-menu-card {
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 24px;
+      padding: 36px 44px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: center;
+      min-width: 280px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+      animation: slideUp 0.3s ease;
+    }
+
+    .mini-menu-card h2 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text-dark);
+    }
+
+    /* Memory Jar overlay */
+    #memory-jar-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 700;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 16, 40, 0.55);
+      backdrop-filter: blur(10px);
+    }
+
+    #memory-jar-ui.open {
+      display: flex;
+    }
+
+    .memory-book {
+      background: var(--cream);
+      border-radius: 20px;
+      padding: 40px 48px;
+      max-width: 560px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+      animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .memory-book h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--brown);
+      margin-bottom: 20px;
+    }
+
+    .memory-item {
+      padding: 12px 0;
+      border-bottom: 1px dashed rgba(139, 94, 60, 0.2);
+      font-size: 0.88rem;
+      color: var(--text-mid);
+      line-height: 1.5;
+    }
+
+    .memory-item .mem-time {
+      font-size: 0.75rem;
+      color: rgba(107, 79, 58, 0.55);
+      margin-top: 3px;
+    }
+
+    .memory-item:last-child {
+      border-bottom: none;
+    }
+
+    .memory-empty {
+      color: var(--text-mid);
+      font-style: italic;
+      opacity: 0.7;
+    }
+
+    /* Star name dialog */
+    #star-name-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 700;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 16, 40, 0.6);
+      backdrop-filter: blur(10px);
+    }
+
+    #star-name-ui.open {
+      display: flex;
+    }
+
+    .star-dialog {
+      background: rgba(26, 16, 60, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 36px 40px;
+      width: 340px;
+      color: white;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(201, 184, 232, 0.2);
+      animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .star-dialog h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--lavender);
+    }
+
+    .star-dialog input {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.1);
+      font-family: 'Quicksand', sans-serif;
+      font-size: 1rem;
+      color: white;
+      outline: none;
+      text-align: center;
+    }
+
+    .star-dialog input::placeholder {
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* Close btn */
+    .close-btn {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--text-mid);
+      pointer-events: all;
+      transition: color 0.2s;
+    }
+
+    .close-btn:hover {
+      color: var(--text-dark);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Star cursor -->
+  <div id="star-cursor">
+    <svg viewBox="0 0 24 24">
+      <path d="M12 2L14.5 9H22L16 13.5L18.5 20.5L12 16L5.5 20.5L8 13.5L2 9H9.5L12 2Z" />
+    </svg>
+  </div>
+
+  <!-- Three.js canvas target -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="smoke-container">
+      <div class="smoke"></div>
+      <div class="smoke"></div>
+      <div class="smoke"></div>
+    </div>
+    <div class="loading-house">🏡</div>
+    <div class="loading-title">Our Little World</div>
+    <div class="loading-sub">Rumah digital kalian berdua ✨</div>
+    <div class="loading-bar-wrap">
+      <div class="loading-bar" id="loading-bar"></div>
+    </div>
+  </div>
+
+  <!-- Join Screen -->
+  <div id="join-screen">
+    <div class="join-card">
+      <div class="loading-house" style="font-size:56px;">🌸</div>
+      <div class="join-title">Our Little World</div>
+      <div class="join-sub">Masuk ke dunia kalian berdua</div>
+
+      <div class="join-field">
+        <label>Nama kamu</label>
+        <input id="join-name" type="text" placeholder="Elfan / Savira" maxlength="16" autocomplete="off" />
+      </div>
+
+      <div class="join-field">
+        <label>Warna karakter</label>
+        <div class="color-picker-row" id="color-picker">
+          <div class="color-dot active" data-color="#7a9e7e" style="background:#7a9e7e"></div>
+          <div class="color-dot" data-color="#f4a261" style="background:#f4a261"></div>
+          <div class="color-dot" data-color="#a8d8ea" style="background:#a8d8ea"></div>
+          <div class="color-dot" data-color="#f2c4ce" style="background:#f2c4ce"></div>
+          <div class="color-dot" data-color="#c9b8e8" style="background:#c9b8e8"></div>
+          <div class="color-dot" data-color="#f6c90e" style="background:#f6c90e"></div>
+          <div class="color-dot" data-color="#e07b54" style="background:#e07b54"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="create-room-btn">🏡 Buat Room Baru</button>
+
+      <div class="join-divider"><span>atau punya kode room?</span></div>
+
+      <div class="join-field">
+        <label>Kode Room</label>
+        <input id="join-code" type="text" placeholder="XXXX" maxlength="4" autocomplete="off"
+          style="text-align:center; text-transform:uppercase; letter-spacing:6px; font-size:1.3rem; font-weight:700;" />
+      </div>
+      <button class="btn btn-secondary" id="join-room-btn">🚪 Masuk ke Room</button>
+
+      <div class="error-msg" id="join-error"></div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="room-info">🌸 Room: <span id="room-code-display">----</span></div>
+    <button id="mute-btn" title="Toggle suara">🔊</button>
+
+    <div id="interact-prompt">
+      <span class="key-badge">E</span><span id="prompt-text">Interaksi</span>
+    </div>
+
+    <div id="notifications"></div>
+  </div>
+
+  <!-- Mini Menu (Esc) -->
+  <div id="mini-menu">
+    <div class="mini-menu-card">
+      <h2>🌸 Menu</h2>
+      <button class="btn btn-secondary" id="menu-mute">🔊 Toggle Suara</button>
+      <button class="btn btn-secondary" id="menu-memories">📖 Memory Jar</button>
+      <button class="btn btn-secondary" id="menu-nameplate">🪧 Ganti Nama Rumah</button>
+      <button class="btn btn-primary" id="menu-close">Kembali ke Dunia</button>
+    </div>
+  </div>
+
+  <!-- Memory Jar UI -->
+  <div id="memory-jar-ui">
+    <div class="memory-book" style="position:relative;">
+      <span class="close-btn" id="memory-close">✕</span>
+      <h2>📖 Memory Jar</h2>
+      <div id="memory-list">
+        <p class="memory-empty">Belum ada memory. Main bareng dulu yuk! 🌸</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Star Name Dialog -->
+  <div id="star-name-ui">
+    <div class="star-dialog">
+      <h3>✨ Beri nama bintang ini</h3>
+      <input id="star-name-input" type="text" placeholder="nama bintang..." maxlength="20" />
+      <button class="btn btn-primary" id="star-name-confirm" style="margin-top:4px;">Simpan ✨</button>
+      <button class="btn btn-secondary" id="star-name-cancel" style="margin-top:-6px;">Batal</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

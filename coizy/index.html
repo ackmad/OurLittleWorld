@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coizy - Our Little World</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=VT323&family=Caveat&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- LOBBY LAYER -->
+  <div id="ui-layer">
+    <div class="lobby-content">
+      <h1 class="logo">Coizy</h1>
+      
+      <div class="terminal-box" id="login-box">
+        <p class="instruction">System Initialization...</p>
+        <p class="instruction" style="margin-bottom: 20px; color: var(--accent);">Waiting for reality coordinates.</p>
+        
+        <div class="input-line">
+          <span class="prompt">&gt;</span>
+          <input type="password" id="passcode" maxlength="6" autocomplete="off" autofocus />
+          <span class="cursor"></span>
+        </div>
+
+        <button id="btn-enter" class="game-btn">MASUK</button>
+        
+        <p id="error-msg" class="error-msg"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- IN-GAME HUD LAYER -->
+  <div id="game-hud" class="hidden">
+    <div class="crosshair">+</div>
+    
+    <div id="interaction-prompt" class="hidden">
+      <span class="key-e">[E]</span> <span id="prompt-text">Berinteraksi</span>
+    </div>
+
+    <!-- Top Left Player Info -->
+    <div class="player-info">
+      <div class="avatar-badge" id="hud-player-color"></div>
+      <span id="hud-player-name">Player</span>
+      <span class="room-code">Room: COIZY</span>
+    </div>
+
+    <!-- Quick Emotes Guide -->
+    <div class="quick-emotes">
+      <p>1: Hai 👋 &nbsp; 2: Dansa 💃 &nbsp; 3: Duduk 🧘</p>
+    </div>
+  </div>
+
+  <!-- MEMORY BOOK UI (Shared Notepad & Album) -->
+  <div id="memory-book" class="modal hidden">
+    <div class="book-container">
+      <button class="close-btn" id="close-book-btn">Tutup (ESC)</button>
+      <div class="book-pages">
+        <div class="page left-page">
+          <h2 class="book-title">Buku Harian Bersama 📖</h2>
+          <textarea id="shared-notes" placeholder="Tuliskan kenangan indah hari ini di sini..."></textarea>
+          <button id="btn-save-note" class="game-btn inline-btn">Simpan Catatan</button>
+        </div>
+        <div class="page right-page">
+          <h2 class="book-title">Album Foto 📷</h2>
+          <div class="photo-grid" id="photo-album-grid">
+            <!-- Photos populate here -->
+            <div class="photo-placeholder">
+              <span>+ Tambah Foto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAME STAR DIALOG -->
+  <div id="star-dialog" class="modal hidden">
+    <div class="book-container star-box">
+      <h3>Beri Nama Bintang ⭐</h3>
+      <p>Langit menyembunyikan cerita. Apa judul bintang ini?</p>
+      <input type="text" id="star-name-input" placeholder="Nama bintang..." maxlength="20" />
+      <button id="btn-name-star" class="game-btn">Simpan ke Langit</button>
+      <button id="btn-close-star" class="game-btn secondary-btn">Batal</button>
+    </div>
+  </div>
+
+  <div id="transition-overlay"></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
