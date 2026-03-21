@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Coizy - Our Little World</title>
+  <link rel="icon" type="image/x-icon" href="https://fav.farm/✨">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,6 +41,10 @@
   <div id="game-hud" class="hidden">
     <div class="crosshair">+</div>
     
+    <div id="compass-bar" class="compass-bar">
+      <div id="compass-text">N 000°</div>
+    </div>
+    
     <div id="interaction-prompt" class="hidden">
       <span class="key-e">[E]</span> <span id="prompt-text">Berinteraksi</span>
     </div>
@@ -55,6 +60,16 @@
     <div class="quick-emotes">
       <p>1: Hai 👋 &nbsp; 2: Dansa 💃 &nbsp; 3: Duduk 🧘</p>
     </div>
+
+    <!-- Inventory for Flowers (Perbaikan 2) -->
+    <div id="inventory-hud" class="inventory-hud">
+       <div class="inv-slot" id="slot-lavender">🌸 <span class="count">0</span></div>
+       <div class="inv-slot" id="slot-daisy">🌼 <span class="count">0</span></div>
+       <div class="inv-slot" id="slot-heather">🌺 <span class="count">0</span></div>
+    </div>
+    
+    <!-- Character Speech Bubble Overlay -->
+    <div id="speech-bubbles-container"></div>
   </div>
 
   <!-- MEMORY BOOK UI (Shared Notepad & Album) -->
@@ -85,9 +100,119 @@
     <div class="book-container star-box">
       <h3>Beri Nama Bintang ⭐</h3>
       <p>Langit menyembunyikan cerita. Apa judul bintang ini?</p>
-      <input type="text" id="star-name-input" placeholder="Nama bintang..." maxlength="20" />
-      <button id="btn-name-star" class="game-btn">Simpan ke Langit</button>
+      <input type="text" id="star-input" placeholder="Nama bintang..." maxlength="20" />
+      <button id="btn-save-star" class="game-btn">Simpan ke Langit</button>
       <button id="btn-close-star" class="game-btn secondary-btn">Batal</button>
+    </div>
+  </div>
+
+  <!-- NAME CARVING DIALOG (Perbaikan 5) -->
+  <div id="carve-dialog" class="modal hidden">
+    <div class="book-container star-box">
+      <h3>Ukir Nama di Batu 🪨</h3>
+      <p>Tinggalkan jejakmu di pantai ini...</p>
+      <input type="text" id="carve-input" placeholder="Teks ukiran..." maxlength="20" />
+      <button id="btn-save-carve" class="game-btn">Ukir Sekarang</button>
+      <button id="btn-close-carve" class="game-btn secondary-btn">Batal</button>
+    </div>
+  </div>
+
+  <!-- EMOTE WHEEL -->
+  <div id="emote-wheel" class="hidden">
+    <div class="wheel-center">Pilih gaya...</div>
+    <div class="wheel-item" style="transform: rotate(0deg) translateY(-80px) rotate(0deg);" data-id="1">👋 Hai</div>
+    <div class="wheel-item" style="transform: rotate(72deg) translateY(-80px) rotate(-72deg);" data-id="2">💃 Dansa</div>
+    <div class="wheel-item" style="transform: rotate(144deg) translateY(-80px) rotate(-144deg);" data-id="3">🧘 Duduk</div>
+    <div class="wheel-item" style="transform: rotate(216deg) translateY(-80px) rotate(-216deg);" data-id="4">✌️ Peace</div>
+    <div class="wheel-item" style="transform: rotate(288deg) translateY(-80px) rotate(-288deg);" data-id="5">🫂 Peluk</div>
+  </div>
+
+  <!-- PAUSE MENU -->
+  <div id="pause-menu" class="hidden">
+    <div class="pause-screen-content">
+      <div class="pause-panel">
+        <h2 class="pause-logo">Coizy</h2>
+        <div class="pause-btns-group">
+          <button class="pause-btn" id="btn-resume"><span>Lanjutkan</span></button>
+          <button class="pause-btn" id="btn-settings"><span>Pengaturan ⚙️</span></button>
+          <button class="pause-btn" id="btn-membook"><span>Buku Kenangan 📖</span></button>
+          <button class="pause-btn" id="btn-wishbook"><span>Buku Harapan 🌟</span></button>
+          <button class="pause-btn" id="btn-sharednote"><span>Catatan Bersama 📝</span></button>
+          <button class="pause-btn" id="btn-quit"><span>Keluar ke Lobby 🚪</span></button>
+        </div>
+      </div>
+
+      <div class="guide-panel">
+        <h3>Panduan Bermain 📜</h3>
+        <div class="guide-scrollable">
+          <section class="guide-section">
+            <h4>🕹️ Kontrol Dasar</h4>
+            <ul>
+              <li><strong>WASD</strong>: Berjalan / Bergerak</li>
+              <li><strong>SHIFT</strong>: Berlari Kencang (Sprint)</li>
+              <li><strong>SPACE</strong>: Melompat (*Jump*)</li>
+              <li><strong>CTRL</strong>: Jongkok / Merangkak (*Crouch*)</li>
+              <li><strong>MOUSE</strong>: Mengarahkan Pandangan</li>
+              <li><strong>[C]</strong>: Ganti Sudut Pandang (1st/3rd Person)</li>
+            </ul>
+          </section>
+
+          <section class="guide-section">
+            <h4>🤝 Aktivitas & Interaksi</h4>
+            <ul>
+              <li><strong>[E]</strong>: Tombol Interaksi Utama (Pohon, Bunga, Pintu, dll)</li>
+              <li><strong>[Q]</strong>: Membuka Roda Emote (Sapa & Ekspresi)</li>
+              <li><strong>[F]</strong>: Melempar Batu ke Air (Splash!)</li>
+              <li><strong>[1-5]</strong>: Pintasan Emote Cepat</li>
+              <li><strong>[ESC]</strong>: Menu / Lepas Mouse</li>
+            </ul>
+          </section>
+
+          <section class="guide-section">
+            <h4>✨ Fitur Spesial</h4>
+            <ul>
+              <li><strong>Petik Bunga</strong>: Kumpulkan Daisy & Lavender untuk saku.</li>
+              <li><strong>Ukir Nama</strong>: Temukan batu pantai untuk mengukir namamu.</li>
+              <li><strong>Bintang</strong>: Gunakan teropong dan beri nama bintangmu.</li>
+              <li><strong>Kupu-kupu</strong>: Dekati dengan pelan agar mereka hinggap.</li>
+              <li><strong>Mata Tuhan [V]</strong>: Kamera terbang bebas melintasi pulau (WASD + Space/Ctrl).</li>
+              <li><strong>Sofa & Tepi Kolam</strong>: Tempat bersantai (Duduk & Menikmati).</li>
+            </ul>
+          </section>
+        </div>
+        <button class="pause-btn secondary-btn" id="btn-reset-tutorial">Ulang Tutorial</button>
+      </div>
+    </div>
+    <div class="settings-panel hidden" id="settings-panel">
+      <h3>Pengaturan ⚙️</h3>
+      <div class="tabs">
+         <span class="tab active" data-tab="visual">Visual</span>
+         <span class="tab" data-tab="audio">Audio</span>
+         <span class="tab" data-tab="controls">Kontrol</span>
+      </div>
+      <div class="tab-content" id="tab-visual">
+         <label>Kecerahan <input type="range" id="set-bright" min="0.5" max="1.5" step="0.1" value="1.0"></label>
+         <label>Efek Glow (Bloom) <input type="checkbox" id="set-bloom" checked></label>
+         <label>Jarak Pandang <input type="range" id="set-draw" min="50" max="250" step="10" value="150"></label>
+      </div>
+      <div class="tab-content hidden" id="tab-audio">
+         <label>Volume Utama <input type="range" id="set-vol-master" min="0" max="100" value="80"></label>
+      </div>
+      <div class="tab-content hidden" id="tab-controls">
+         <label>Sensitivitas Mouse <input type="range" id="set-sens" min="0.001" max="0.01" step="0.001" value="0.002"></label>
+         <label>Invert Y-Axis <input type="checkbox" id="set-invert"></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING SCREEN -->
+  <div id="loading-screen" class="hidden">
+    <div class="loading-content">
+      <h1 class="logo rotating">Coizy</h1>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="loading-fill"></div>
+      </div>
+      <p id="loading-text" class="loading-text">Menyiapkan duniamu...</p>
     </div>
   </div>
 

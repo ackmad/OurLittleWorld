@@ -37,7 +37,13 @@ body, html {
   display: flex;
   justify-content: center;
   align-items: center;
-  pointer-events: none; /* Let canvas get clicks except for the box */
+  pointer-events: none;
+  /* Soft dark vignette to ensure login card is readable against 3D scene */
+  background: radial-gradient(
+    ellipse at center,
+    rgba(10, 6, 20, 0.25) 0%,
+    rgba(10, 6, 20, 0.55) 100%
+  );
 }
 
 .lobby-content {
@@ -45,26 +51,35 @@ body, html {
   flex-direction: column;
   align-items: center;
   pointer-events: auto;
+  gap: 4px;
 }
 
 .logo {
   font-family: 'Baloo 2', cursive;
-  font-size: 5rem;
+  font-size: 5.5rem;
   color: var(--text-main);
-  text-shadow: 0 0 20px rgba(242, 168, 122, 0.8), 0 0 40px rgba(242, 168, 122, 0.4);
+  text-shadow:
+    0 0 20px rgba(242, 168, 122, 0.9),
+    0 0 50px rgba(242, 168, 122, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.6);
   animation: float 4s ease-in-out infinite;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
 }
 
 .terminal-box {
-  background: rgba(31, 27, 36, 0.5);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 30px;
-  border-radius: 15px;
-  width: 380px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  background: rgba(14, 10, 22, 0.82);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(242, 168, 122, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 32px 30px 28px;
+  border-radius: 20px;
+  width: 390px;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(242, 168, 122, 0.08) inset,
+    0 0 40px rgba(242, 168, 122, 0.06) inset;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -187,8 +202,8 @@ body, html {
 }
 
 /* Added HUD & In-Game UI Styles */
-body.in-game {
-  cursor: none; /* PointerLock takes over cursor */
+body.pointer-locked {
+  cursor: none; /* Hide cursor only when pointer-locked */
 }
 
 .hidden {
@@ -215,9 +230,6 @@ body.in-game {
 }
 
 #interaction-prompt {
-  position: absolute;
-  top: 60%; left: 50%;
-  transform: translateX(-50%);
   background: rgba(0, 0, 0, 0.6);
   padding: 8px 16px;
   border-radius: 20px;
@@ -227,6 +239,9 @@ body.in-game {
   letter-spacing: 1px;
   font-size: 1.1rem;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  /* position, top, & left di-handle otomatis oleh CSS2DObject */
 }
 
 .key-e {
@@ -272,10 +287,51 @@ body.in-game {
   padding: 10px 20px;
   border-radius: 15px;
   color: rgba(255,255,255,0.8);
-  font-family: 'VT323', monospace;
-  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  display: flex;
+  align-items: center;
 }
 
+.pause-btn:hover {
+  background: rgba(242, 168, 122, 0.15);
+  border-color: var(--primary);
+  transform: translateX(10px);
+}
+
+.pause-btn.secondary-btn {
+  margin-top: 20px;
+  background: transparent;
+  justify-content: center;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+.pause-btn.secondary-btn:hover {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Settings integration */
+.settings-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1620;
+  border: 1px solid var(--accent);
+  padding: 30px;
+  border-radius: 20px;
+  width: 400px;
+  z-index: 1100;
+  box-shadow: 0 0 100px rgba(0,0,0,0.8);
+}
 /* Modals */
 .modal {
   position: absolute;
@@ -301,7 +357,6 @@ body.in-game {
 
 .star-box {
   width: 400px; height: auto; padding: 40px; text-align: center;
-  font-family: 'Baloo 2', sans-serif; color: #333;
 }
 
 .star-box h3 { margin-bottom: 10px; font-size: 1.8rem; color: #222; }
@@ -393,4 +448,293 @@ body.in-game {
   20%, 80% { transform: translate3d(2px, 0, 0); }
   30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
   40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+.toast-bubble {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: rgba(20, 12, 5, 0.85);
+  backdrop-filter: blur(8px);
+  padding: 10px 25px;
+  border-radius: 30px;
+  color: #F2E8D8;
+  font-family: 'Baloo 2', sans-serif;
+  font-size: 1.2rem;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 10px rgba(232, 138, 138, 0.2);
+}
+.toast-bubble.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* 7.7 LOADING SCREEN */
+#loading-screen {
+  position: absolute; top:0; left:0; width:100%; height:100%;
+  background: linear-gradient(160deg, #110b1e 0%, #1a0e2a 40%, #0d1525 100%);
+  z-index: 9999;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 10px;
+}
+
+/* Ambient glow orbs inside loading screen */
+#loading-screen::before {
+  content: '';
+  position: absolute;
+  width: 350px; height: 350px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(242, 168, 122, 0.12) 0%, transparent 70%);
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  animation: breathe 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+}
+
+.rotating {
+  animation: rotate 6s linear infinite;
+  display: block;
+  filter: drop-shadow(0 0 30px rgba(242, 168, 122, 0.6));
+}
+@keyframes rotate { 100% { transform: rotate(360deg); } }
+
+.progress-bar-container {
+  width: 280px; height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 99px; margin: 24px 0 8px; overflow: hidden;
+  box-shadow: 0 0 10px rgba(242, 168, 122, 0.15);
+}
+.progress-bar-fill {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, #dca776, #f2a87a, #e88a8a);
+  border-radius: 99px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 12px rgba(242, 168, 122, 0.5);
+}
+.loading-text {
+  font-family: 'Baloo 2', sans-serif;
+  color: rgba(242, 232, 216, 0.7);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 1px;
+  animation: pulseOpacity 2s infinite;
+  text-align: center;
+}
+@keyframes pulseOpacity { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
+
+/* 7.2 COMPASS */
+.compass-bar {
+  position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+  width: 200px; height: 30px; background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(5px); border-radius: 15px;
+  display: flex; justify-content: center; align-items: center;
+  color: #F2E8D8; font-family: 'VT323', monospace; font-size: 1.5rem;
+  border-bottom: 2px solid var(--accent); transition: opacity 0.3s;
+}
+
+/* EMOTE WHEEL */
+#emote-wheel {
+  position: absolute; top:50%; left:50%; width: 200px; height: 200px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto; z-index: 50;
+}
+.wheel-center {
+  position: absolute; top:50%; left:50%; transform: translate(-50%,-50%);
+  color: #fff; font-family: 'Baloo 2';
+}
+.wheel-item {
+  position: absolute; top:50%; left:50%;
+  width: 60px; height: 60px; background: rgba(0,0,0,0.7);
+  border-radius: 50%; display: flex; justify-content: center; align-items: center;
+  margin-left: -30px; margin-top: -30px; cursor: pointer; color: white; font-family: 'Baloo 2';
+  transition: all 0.2s; border: 2px solid transparent;
+}
+.wheel-item:hover { border-color: var(--primary); transform: scale(1.1) !important; z-index: 2; }
+
+/* 7.3 PAUSE MENU & SETTINGS */
+/* =========================================
+   PAUSE MENU — Premium Glassmorphism
+========================================= */
+#pause-menu {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%; z-index: 1000;
+  background: radial-gradient(circle at center, rgba(31, 27, 36, 0.2) 0%, rgba(10, 6, 20, 0.6) 100%);
+  backdrop-filter: blur(25px) saturate(1.2); -webkit-backdrop-filter: blur(25px) saturate(1.2);
+  display: flex; justify-content: center; align-items: center;
+  pointer-events: auto;
+}
+
+.pause-screen-content {
+  display: flex; gap: 30px;
+  animation: modalIn 0.5s ease-out forwards;
+  max-width: 90%;
+}
+
+.pause-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 40px; border-radius: 24px;
+  min-width: 320px; display: flex; flex-direction: column;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+}
+
+.pause-logo {
+  font-family: 'Baloo 2', cursive; font-size: 3rem; color: #fff;
+  text-align: center; margin-bottom: 30px;
+  text-shadow: 0 0 20px rgba(242, 168, 122, 0.5);
+}
+
+.pause-btns-group { display: flex; flex-direction: column; gap: 12px; }
+
+/* Guide Panel */
+.guide-panel {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 40px; border-radius: 24px;
+  width: 480px; color: #fff; max-height: 80vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+}
+
+.guide-panel h3 {
+  font-family: 'Baloo 2', cursive; font-size: 1.8rem;
+  margin-bottom: 20px; color: var(--primary);
+}
+
+.guide-scrollable { overflow-y: auto; padding-right: 15px; }
+
+.guide-scrollable::-webkit-scrollbar { width: 5px; }
+.guide-scrollable::-webkit-scrollbar-track { background: transparent; }
+.guide-scrollable::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+.guide-section { margin-bottom: 25px; }
+.guide-section h4 {
+  font-size: 1.2rem; margin-bottom: 10px; opacity: 0.9;
+  border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;
+}
+.guide-section ul { list-style: none; }
+.guide-section li { font-size: 1rem; margin-bottom: 6px; color: #ddd; }
+.guide-section strong { color: var(--primary); width: 80px; display: inline-block; }
+
+/* Universal Pause Button Style */
+.pause-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff; padding: 18px 24px; border-radius: 18px;
+  font-family: 'Baloo 2', cursive; font-size: 1.25rem;
+  cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left; display: flex; align-items: center;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+.pause-btn:hover {
+  background: linear-gradient(135deg, rgba(242, 168, 122, 0.2), rgba(242, 168, 122, 0.1));
+  border-color: rgba(242, 168, 122, 0.5);
+  transform: translateX(12px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(242, 168, 122, 0.15);
+}
+.pause-btn.secondary-btn {
+  margin-top: auto; background: transparent;
+  justify-content: center; font-size: 1.05rem; opacity: 0.4; 
+  border: 1px dashed rgba(255,255,255,0.15);
+  text-align: center;
+}
+.pause-btn.secondary-btn:hover { 
+  opacity: 0.9; transform: translateY(-3px); 
+  border-style: solid; border-color: var(--primary);
+  background: rgba(242, 168, 122, 0.05);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.settings-panel {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: rgba(20, 16, 26, 0.95); backdrop-filter: blur(20px);
+  border: 1px solid var(--accent); padding: 40px; border-radius: 24px;
+  width: 440px; z-index: 1100; box-shadow: 0 0 100px rgba(0,0,0,0.8);
+}
+.settings-panel h3 { font-size: 2rem; margin-bottom: 20px; font-family: 'Baloo 2'; }
+.tabs { display: flex; gap: 15px; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.tab { padding: 10px 15px; cursor: pointer; opacity: 0.5; transition: 0.2s; font-family: 'Baloo 2'; }
+.tab.active { opacity: 1; color: var(--primary); border-bottom: 2px solid var(--primary); }
+.tab-content { display: flex; flex-direction: column; gap: 18px; }
+.tab-content label { display: flex; justify-content: space-between; align-items: center; font-size: 1.1rem; }
+.tab-content input[type="range"] { accent-color: var(--primary); width: 120px; }
+
+
+/* INVENTORY HUD (Perbaikan 2) */
+.inventory-hud {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.inv-slot {
+  width: 60px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+.inv-slot.pop { transform: scale(1.3); background: rgba(255, 255, 255, 0.4); }
+.inv-slot .count {
+  font-size: 14px;
+  font-weight: bold;
+  font-family: 'Baloo 2', cursive;
+  margin-top: -5px;
+}
+
+/* SPEECH BUBBLES */
+.speech-bubble {
+  position: absolute;
+  background: white;
+  padding: 8px 15px;
+  border-radius: 15px;
+  font-family: 'Caveat', cursive;
+  font-size: 18px;
+  color: #333;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  pointer-events: none;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  animation: bubble-float 3s ease-in-out forwards;
+}
+@keyframes bubble-float {
+  0% { transform: translate(-50%, -80%); opacity: 0; }
+  15% { transform: translate(-50%, -100%); opacity: 1; }
+  85% { transform: translate(-50%, -105%); opacity: 1; }
+  100% { transform: translate(-50%, -115%); opacity: 0; }
+}
+
+/* IN-WORLD CARVING */
+.carving-text {
+  font-family: 'Caveat', cursive;
+  color: #F5EDDA;
+  font-size: 24px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+  pointer-events: none;
+  text-align: center;
 }

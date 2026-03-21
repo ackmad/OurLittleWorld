@@ -12,8 +12,10 @@
     "vite": "^8.0.1"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "gsap": "^3.14.2",
     "socket.io-client": "^4.8.3",
-    "three": "^0.183.2"
+    "three": "^0.183.2",
+    "yuka": "^0.7.8"
   }
 }
