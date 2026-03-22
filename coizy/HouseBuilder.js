@@ -30,19 +30,20 @@ export class HouseBuilder {
         this.porchLight     = null;
 
         this.C = {
-            wallCream:   0xF0E6D0, wallCream2:  0xE5D9C0,
-            beamDark:    0x4A3018, beamMed:     0x6B4828, beamLight: 0x8A6038,
-            thatchTop:   0xDEB84A, thatchMid:   0xC8A030, thatchBot: 0xA07828,
-            ridgeBeam:   0x382010,
-            stone:       0xA0A098, stoneDark:   0x7A7870, stoneMoss: 0x6A8050,
-            brick:       0xC85840, brickMortar: 0xC8B8A5,
-            doorWood:    0x6B4020, doorDark:    0x3A2010,
-            windowFrame: 0x3A2810, shutterGreen:0x527840,
-            glass:       0xC8E8FF,
-            ivyDark:     0x386020, ivyLight:    0x588030, ivyFall:   0xB85820,
-            flowerPink:  0xE87890, flowerWhite: 0xFFF0E5, flowerLav: 0xB088D8,
-            potTerra:    0xC06040, brass:       0xC8980C, ironDark:  0x282828,
-            porchWood:   0x8A5828, railWood:    0x704820,
+            // Updated to Pastel Coizy Colors
+            wallCream:   0xFDDBB4, wallCream2:  0xFFF0A8, // Peach & Butter
+            beamDark:    0xFF9E6C, beamMed:     0xF8C840, beamLight: 0xF8D4E4, // Tangerine, Sunshine, Rose Mist
+            thatchTop:   0xF8D4E4, thatchMid:   0xE878A8, thatchBot: 0xFF9E6C, // Rose mist, bubblegum, tangerine
+            ridgeBeam:   0xA898E8, // Lilac
+            stone:       0xDDD4F8, stoneDark:   0xA898E8, stoneMoss: 0xC8F0D8, // Lavender, Lilac, Mint
+            brick:       0xFF9E6C, brickMortar: 0xFDDBB4, // Tangerine, Peach
+            doorWood:    0xFDDBB4, doorDark:    0xFF9E6C, // Peach, Tangerine
+            windowFrame: 0x7CC8A0, shutterGreen:0xC8F0D8, // Sage, Mint
+            glass:       0xC2E4FB, // Baby Blue
+            ivyDark:     0x7CC8A0, ivyLight:    0xC8F0D8, ivyFall:   0xFF9E6C, // Sage, Mint, Tangerine
+            flowerPink:  0xE878A8, flowerWhite: 0xFFF0A8, flowerLav: 0xA898E8, // Bubblegum, Butter, Lilac
+            potTerra:    0xFF9E6C, brass:       0xF8C840, ironDark:  0xA898E8, // Tangerine, Sunshine, Lilac
+            porchWood:   0xFDDBB4, railWood:    0xFF9E6C, // Peach, Tangerine
         };
     }
 

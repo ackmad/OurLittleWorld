@@ -10,6 +10,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import gsap from 'gsap';
 import { io } from 'socket.io-client';
@@ -78,25 +79,33 @@ camera.position.set(0, 10, 40);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
+// Membatasi pixel ratio ke 0.8 untuk performa drastis ("Chunky Flat Pastel" makin terasa)
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.8));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.6;
+renderer.toneMappingExposure = 1.3;
+
+const effect = new OutlineEffect(renderer, {
+  defaultThickness: 0.0035,
+  defaultColor: [0.65, 0.55, 0.45], // Pastel warm gray outline instead of harsh black
+  defaultAlpha: 1.0,
+  defaultKeepAlive: true
+});
 
 // Sky & Fog globals
 let sky, sun;
 function setupSky() {
-  scene.background = new THREE.Color(0x8fd4f0);
-  scene.fog = new THREE.Fog(0xb0ddf8, 35, 300);
+  scene.background = new THREE.Color(0xC2E4FB); // Baby Blue
+  scene.fog = new THREE.Fog(0xC2E4FB, 35, 300);
 
   // Still use the sky dome for a beautiful gradient, but update colors to match spec
   const skyGeo = new THREE.SphereGeometry(2000, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     uniforms: {
-      topColor:    { value: new THREE.Color(0x8fd4f0) },
-      bottomColor: { value: new THREE.Color(0xb0ddf8) }
+      topColor:    { value: new THREE.Color(0xC2E4FB) }, // Baby Blue
+      bottomColor: { value: new THREE.Color(0xF8D4E4) } // Rose Mist horizon
     },
     vertexShader: `
       varying vec3 vWorldPos;
@@ -115,6 +124,7 @@ function setupSky() {
       }
     `
   });
+  skyMat.userData.outlineParameters = { visible: false };
 
   const skyMesh = new THREE.Mesh(skyGeo, skyMat);
   skyMesh.name = "SkyDome";
@@ -132,14 +142,14 @@ function setupSky() {
 setupSky();
 
 // Lighting — Phase 1 Specifications
-const ambientLight = new THREE.AmbientLight(0xb8e0f8, 0.8);
+const ambientLight = new THREE.AmbientLight(0xDDD4F8, 0.95); // Lavender ambient
 scene.add(ambientLight);
 
 const sd = 120; // Increased shadow area for larger island
-const sunLight = new THREE.DirectionalLight(0xffeebb, 3.5);
+const sunLight = new THREE.DirectionalLight(0xFFF0A8, 2.5); // Butter daylight
 sunLight.position.set(120, 160, 100);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.setScalar(2048);
+sunLight.shadow.mapSize.setScalar(1024);
 sunLight.shadow.camera.left = -sd;
 sunLight.shadow.camera.right = sd;
 sunLight.shadow.camera.top = sd;
@@ -147,10 +157,10 @@ sunLight.shadow.camera.bottom = -sd;
 sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 250;
 sunLight.shadow.bias = -0.0008;
-sunLight.shadow.radius = 12;
+sunLight.shadow.radius = 16;
 scene.add(sunLight);
 
-const hemiLight = new THREE.HemisphereLight(0x8fd4f0, 0xffd180, 0.95);
+const hemiLight = new THREE.HemisphereLight(0xF8D4E4, 0xFDDBB4, 1.2); // Rose mist sky, Peach ground
 scene.add(hemiLight);
 
 // Post Processing — Vignette + Bloom (Bloom strength dinamis via settings)
@@ -482,7 +492,10 @@ function animate() {
   }
 
   lastT = time;
-  composer.render();
+  // Membuang composer.render() karena effect.render(scene, camera) sudah me-render seluruh scene 
+  // beserta outline-nya. Menjalankan keduanya melakukan rendering 2x dan menyebabkan drop FPS.
+  // composer.render(); 
+  effect.render(scene, camera); 
   labelRenderer.render(scene, camera);
 }
 animate();
@@ -575,17 +588,56 @@ async function initGameEngine(player) {
     .setCollisionGroups((Layers.PLAYER << 16) | (0xffff)); // Simple all collide for start
   physicsWorld.createCollider(playerColliderDesc, playerBody);
 
-  // === PLAYER VISUAL (untuk Mata Tuhan/Free Cam) ===
+  // === PLAYER VISUAL (Coizy Chubby Aesthetic) ===
   const playerVisGroup = new THREE.Group();
   playerVisGroup.name = "PlayerVisual";
-  // Reduced size: Radius 0.4, Length 1.0 (Total height 1.8)
-  const bodyMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.0, 4, 8), new THREE.MeshStandardMaterial({ color: player.c }));
-  bodyMesh.position.y = 0; // Centered
+  
+  // Chubby body
+  const bodyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.48, 16, 16), new THREE.MeshStandardMaterial({ color: player.c, roughness: 1.0, flatShading: false }));
+  bodyMesh.position.y = 0.1; // Centered lower
   playerVisGroup.add(bodyMesh);
   
-  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), new THREE.MeshStandardMaterial({ color: '#ffe0bd' }));
-  headMesh.position.y = 0.75; // Skala kepala proporsional
+  // Head
+  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), new THREE.MeshStandardMaterial({ color: player.c, roughness: 1.0 }));
+  headMesh.position.y = 0.65;
   playerVisGroup.add(headMesh);
+  
+  // Mata Besar
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x4a4a4a });
+  const eyeGeo = new THREE.SphereGeometry(0.065, 8, 8);
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat); leftEye.position.set(-0.16, 0.72, 0.37);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat); rightEye.position.set(0.16, 0.72, 0.37);
+  
+  // Titik Highlight Putih
+  const hlMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+  const hlGeo = new THREE.SphereGeometry(0.025, 6, 6);
+  const lHl = new THREE.Mesh(hlGeo, hlMat); lHl.position.set(-0.02, 0.025, 0.05); leftEye.add(lHl);
+  const rHl = new THREE.Mesh(hlGeo, hlMat); rHl.position.set(-0.02, 0.025, 0.05); rightEye.add(rHl);
+  
+  playerVisGroup.add(leftEye, rightEye);
+  
+  // Blush Cheeks (Ellipse oranye/pink)
+  const blushMat = new THREE.MeshBasicMaterial({ color: 0xFF9E6C, transparent: true, opacity: 0.45 });
+  const blushGeo = new THREE.CircleGeometry(0.07, 12);
+  const lBlush = new THREE.Mesh(blushGeo, blushMat); lBlush.position.set(-0.28, 0.62, 0.33); lBlush.rotation.y = -0.4;
+  const rBlush = new THREE.Mesh(blushGeo, blushMat); rBlush.position.set(0.28, 0.62, 0.33); rBlush.rotation.y = 0.4;
+  playerVisGroup.add(lBlush, rBlush);
+  
+  // Small limbs
+  const limbMat = new THREE.MeshStandardMaterial({ color: player.c });
+  const limbGeo = new THREE.CapsuleGeometry(0.08, 0.15, 4, 8);
+  const lArm = new THREE.Mesh(limbGeo, limbMat); lArm.position.set(-0.48, 0.2, 0.0); lArm.rotation.z = 0.4;
+  const rArm = new THREE.Mesh(limbGeo, limbMat); rArm.position.set(0.48, 0.2, 0.0); rArm.rotation.z = -0.4;
+  const lLeg = new THREE.Mesh(limbGeo, limbMat); lLeg.position.set(-0.2, -0.3, 0);
+  const rLeg = new THREE.Mesh(limbGeo, limbMat); rLeg.position.set(0.2, -0.3, 0);
+  playerVisGroup.add(lArm, rArm, lLeg, rLeg);
+  
+  // Simple dark shadow under character (no real shadow drop)
+  const shadowMat = new THREE.MeshBasicMaterial({ color: 0x7F73B8, transparent: true, opacity: 0.2, depthWrite: false });
+  const blobShadow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), shadowMat);
+  blobShadow.rotation.x = -Math.PI / 2;
+  blobShadow.position.y = -0.45;
+  playerVisGroup.add(blobShadow);
   
   playerGroup.add(playerVisGroup);
   playerVisual = playerVisGroup;
@@ -1250,7 +1302,8 @@ function updatePhysics(delta, time) {
     if (keysPressed['ControlLeft'] || keysPressed['ControlRight']) camera.position.addScaledVector(upVec, -freeSpeed);
   }
 
-  let speed = isSprint ? 8.0 : (isCrouch ? 2.0 : 4.5);
+  // Kecepatan dinaikkan: lari jauh lebih cepat daripada jalan
+  let speed = isSprint ? 12.0 : (isCrouch ? 2.0 : 6.0);
 
   // Slope slide
   if (isGrounded && slopeAngleDeg > 45 && slopeAngleDeg < 70 && hit) {
@@ -1326,8 +1379,8 @@ function updatePhysics(delta, time) {
     const isSwim = (pTrans.y - 0.6) < 0.2;
     let bobAmp = 0;
     if (isGrounded && !isSwim && !isClimbing && moveDir.lengthSq() > 0.01) {
-      bobAmp = isSprint ? 0.07 : 0.04;
-      headBobTimer += delta * (isSprint ? 2.8 : 1.8) * 10;
+      bobAmp = isSprint ? 0.08 : 0.04;
+      headBobTimer += delta * (isSprint ? 3.5 : 2.2) * 10;
     } else {
       headBobTimer += delta * 10;
     }
@@ -1346,7 +1399,7 @@ function updatePhysics(delta, time) {
     // FOV
     let targetFOV = 75;
     if (isCrouch) targetFOV = 70;
-    else if (isSprint && moveDir.lengthSq() > 0.01) targetFOV = 82;
+    else if (isSprint && moveDir.lengthSq() > 0.01) targetFOV = 92;
     camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 8.0 * delta);
     camera.updateProjectionMatrix();
 

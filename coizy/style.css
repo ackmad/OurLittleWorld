@@ -1,9 +1,17 @@
 :root {
-  --primary: #f2a87a;
-  --bg-dark: #1f1b24;
-  --accent: #dca776;
-  --text-main: #fffcf8;
-  --error: #ff6b6b;
+  --primary: #FF9E6C; /* Tangerine */
+  --bg-dark: #FCF6EC; /* Cream for the dot grid */
+  --accent: #E878A8; /* Bubblegum */
+  --text-main: #4a4a4a; /* Text should be dark and pleasant on light bg */
+  --error: #FF6B6B;
+  
+  /* Coizy Palette */
+  --peach: #FDDBB4;
+  --mint: #C8F0D8;
+  --lavender: #DDD4F8;
+  --baby-blue: #C2E4FB;
+  --rose-mist: #F8D4E4;
+  --butter: #FFF0A8;
 }
 
 * {
@@ -16,8 +24,11 @@ body, html {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  font-family: 'VT323', monospace;
+  font-family: 'Baloo 2', 'VT323', monospace;
   background-color: var(--bg-dark);
+  /* Cream dot grid */
+  background-image: radial-gradient(#d4c4a8 2px, transparent 2px);
+  background-size: 24px 24px;
 }
 
 #bg-canvas {
@@ -38,11 +49,11 @@ body, html {
   justify-content: center;
   align-items: center;
   pointer-events: none;
-  /* Soft dark vignette to ensure login card is readable against 3D scene */
+  /* Soft vignette for pastel scene */
   background: radial-gradient(
     ellipse at center,
-    rgba(10, 6, 20, 0.25) 0%,
-    rgba(10, 6, 20, 0.55) 100%
+    rgba(252, 246, 236, 0.0) 0%,
+    rgba(252, 246, 236, 0.4) 100%
   );
 }
 
@@ -59,27 +70,19 @@ body, html {
   font-size: 5.5rem;
   color: var(--text-main);
   text-shadow:
-    0 0 20px rgba(242, 168, 122, 0.9),
-    0 0 50px rgba(242, 168, 122, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.6);
+    0 4px 0px rgba(217, 115, 64, 0.4);
   animation: float 4s ease-in-out infinite;
   margin-bottom: 16px;
   letter-spacing: 2px;
 }
 
 .terminal-box {
-  background: rgba(14, 10, 22, 0.82);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid rgba(242, 168, 122, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--peach);
+  border: 4px solid #D9A975;
   padding: 32px 30px 28px;
-  border-radius: 20px;
+  border-radius: 24px;
   width: 390px;
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(242, 168, 122, 0.08) inset,
-    0 0 40px rgba(242, 168, 122, 0.06) inset;
+  box-shadow: 0 10px 0 rgba(217, 169, 117, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -95,11 +98,11 @@ body, html {
   display: flex;
   align-items: center;
   width: 100%;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--bg-dark);
   padding: 10px 15px;
-  border-radius: 8px;
-  border: 1px solid var(--accent);
-  box-shadow: inset 0 0 10px rgba(220, 167, 118, 0.2);
+  border-radius: 12px;
+  border: 3px solid #D9A975;
+  box-shadow: inset 0 2px 0 rgba(217, 169, 117, 0.2);
   margin-bottom: 20px;
   position: relative;
 }
@@ -145,28 +148,29 @@ body, html {
 
 .game-btn {
   font-family: 'Baloo 2', cursive;
-  background: rgba(220, 167, 118, 0.8);
-  border: none;
-  padding: 8px 30px;
-  font-size: 1.2rem;
+  background: var(--tangerine);
+  border: 3px solid #D97340;
+  padding: 10px 30px;
+  font-size: 1.4rem;
   color: #fff;
   border-radius: 20px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  box-shadow: 0 0 15px rgba(220, 167, 118, 0.4);
+  box-shadow: 0 8px 0 rgba(217, 115, 64, 0.4);
 }
 
 .game-btn:hover {
-  background: var(--primary);
-  transform: scale(1.05);
-  box-shadow: 0 0 25px rgba(242, 168, 122, 0.8);
+  background: #ffaa7d;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 0 rgba(217, 115, 64, 0.4);
 }
 
 .game-btn:active {
-  transform: scale(0.95);
+  transform: translateY(6px);
+  box-shadow: 0 2px 0 rgba(217, 115, 64, 0.4);
 }
 
 .error-msg {
@@ -256,14 +260,14 @@ body.pointer-locked {
   display: flex;
   align-items: center;
   gap: 15px;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--baby-blue);
   padding: 10px 20px;
   border-radius: 25px;
-  backdrop-filter: blur(8px);
   color: var(--text-main);
   font-family: 'Baloo 2', sans-serif;
   font-size: 1.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 3px solid #82B9D8;
+  box-shadow: 0 6px 0 rgba(130, 185, 216, 0.4);
 }
 
 .avatar-badge {
@@ -581,8 +585,7 @@ body.pointer-locked {
 #pause-menu {
   position: absolute; top: 0; left: 0;
   width: 100%; height: 100%; z-index: 1000;
-  background: radial-gradient(circle at center, rgba(31, 27, 36, 0.2) 0%, rgba(10, 6, 20, 0.6) 100%);
-  backdrop-filter: blur(25px) saturate(1.2); -webkit-backdrop-filter: blur(25px) saturate(1.2);
+  background: rgba(194, 228, 251, 0.85); /* Baby Blue overlay */
   display: flex; justify-content: center; align-items: center;
   pointer-events: auto;
 }
@@ -594,34 +597,34 @@ body.pointer-locked {
 }
 
 .pause-panel {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--butter);
+  border: 4px solid #D6BC76;
   padding: 40px; border-radius: 24px;
   min-width: 320px; display: flex; flex-direction: column;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 0 rgba(214, 188, 118, 0.4);
 }
 
 .pause-logo {
-  font-family: 'Baloo 2', cursive; font-size: 3rem; color: #fff;
+  font-family: 'Baloo 2', cursive; font-size: 3rem; color: var(--text-main);
   text-align: center; margin-bottom: 30px;
-  text-shadow: 0 0 20px rgba(242, 168, 122, 0.5);
+  text-shadow: 0 4px 0 rgba(214, 188, 118, 0.4);
 }
 
 .pause-btns-group { display: flex; flex-direction: column; gap: 12px; }
 
 /* Guide Panel */
 .guide-panel {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--lavender);
+  border: 4px solid #A898E8;
   padding: 40px; border-radius: 24px;
-  width: 480px; color: #fff; max-height: 80vh;
+  width: 480px; color: var(--text-main); max-height: 80vh;
   display: flex; flex-direction: column;
-  box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 0 rgba(168, 152, 232, 0.4);
 }
 
 .guide-panel h3 {
   font-family: 'Baloo 2', cursive; font-size: 1.8rem;
-  margin-bottom: 20px; color: var(--primary);
+  margin-bottom: 20px; color: #7F73B8;
 }
 
 .guide-scrollable { overflow-y: auto; padding-right: 15px; }
@@ -633,39 +636,49 @@ body.pointer-locked {
 .guide-section { margin-bottom: 25px; }
 .guide-section h4 {
   font-size: 1.2rem; margin-bottom: 10px; opacity: 0.9;
-  border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;
+  border-bottom: 2px solid #A898E8; padding-bottom: 5px;
+  color: #554C75;
 }
 .guide-section ul { list-style: none; }
-.guide-section li { font-size: 1rem; margin-bottom: 6px; color: #ddd; }
-.guide-section strong { color: var(--primary); width: 80px; display: inline-block; }
+.guide-section li { font-size: 1rem; margin-bottom: 6px; color: var(--text-main); }
+.guide-section strong { color: #7F73B8; width: 80px; display: inline-block; }
 
 /* Universal Pause Button Style */
 .pause-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #fff; padding: 18px 24px; border-radius: 18px;
+  background: var(--mint);
+  border: 3px solid #7CC8A0;
+  color: var(--text-main); padding: 18px 24px; border-radius: 18px;
   font-family: 'Baloo 2', cursive; font-size: 1.25rem;
-  cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left; display: flex; align-items: center;
   letter-spacing: 0.5px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  box-shadow: 0 6px 0 rgba(124, 200, 160, 0.4);
 }
 .pause-btn:hover {
-  background: linear-gradient(135deg, rgba(242, 168, 122, 0.2), rgba(242, 168, 122, 0.1));
-  border-color: rgba(242, 168, 122, 0.5);
-  transform: translateX(12px) scale(1.02);
-  box-shadow: 0 15px 35px rgba(242, 168, 122, 0.15);
+  background: #E8F8EE; /* Ligher Mint */
+  border-color: #7CC8A0;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 0 rgba(124, 200, 160, 0.4);
+}
+.pause-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(124, 200, 160, 0.4);
 }
 .pause-btn.secondary-btn {
-  margin-top: auto; background: transparent;
-  justify-content: center; font-size: 1.05rem; opacity: 0.4; 
-  border: 1px dashed rgba(255,255,255,0.15);
+  margin-top: auto; background: var(--peach);
+  justify-content: center; font-size: 1.05rem; opacity: 1; 
+  border: 3px solid #FF9E6C;
   text-align: center;
+  box-shadow: 0 6px 0 rgba(255, 158, 108, 0.4);
 }
 .pause-btn.secondary-btn:hover { 
-  opacity: 0.9; transform: translateY(-3px); 
-  border-style: solid; border-color: var(--primary);
-  background: rgba(242, 168, 122, 0.05);
+  transform: translateY(-2px); 
+  background: #FFE8D6;
+  box-shadow: 0 8px 0 rgba(255, 158, 108, 0.4);
+}
+.pause-btn.secondary-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(255, 158, 108, 0.4);
 }
 
 @keyframes modalIn {
@@ -675,9 +688,9 @@ body.pointer-locked {
 
 .settings-panel {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  background: rgba(20, 16, 26, 0.95); backdrop-filter: blur(20px);
-  border: 1px solid var(--accent); padding: 40px; border-radius: 24px;
-  width: 440px; z-index: 1100; box-shadow: 0 0 100px rgba(0,0,0,0.8);
+  background: var(--rose-mist);
+  border: 4px solid #F2A9C9; padding: 40px; border-radius: 24px;
+  width: 440px; z-index: 1100; box-shadow: 0 10px 0 rgba(242, 169, 201, 0.4);
 }
 .settings-panel h3 { font-size: 2rem; margin-bottom: 20px; font-family: 'Baloo 2'; }
 .tabs { display: flex; gap: 15px; margin-bottom: 25px; border-bottom: 1px solid rgba(255,255,255,0.1); }

@@ -5,32 +5,65 @@ import { HouseBuilder } from './HouseBuilder.js';
 //  COLOUR PALETTE — Brighter
 // ===========================
 const C = {
-    dirt: 0xA08060,
-    grass: 0x8FBF6A,
-    sand: 0xE8D4A0,
-    grassVar1: 0x9AC870,
-    grassVar2: 0xB0D880,
-    oceanNear: 0x3AB4D8, oceanFar: 0x1880B0,
-    foundation: 0x9AB090, woodWall: 0xAD8464, wallPeel: 0xF0E8DC, cornerBeam: 0x7A5C45,
-    thatchTop: 0xE0BD7A, thatchBot: 0xB09858, ridgeBeam: 0x6A5040,
-    doorFrame: 0x5A3828, doorWood: 0x8B6448, doorHinge: 0x2A2A2A, doorKnob: 0xE8C860,
-    windowGlass: 0xD8F4FF, shutters: 0x7AAC64,
-    lavenderBloom: 0xB890E8, geranium: 0xE84848,
-    chimneyBrick: 0xC06040, chimneyMortar: 0xD0B8A8,
-    oakBark: 0x7A5530, 
-    oakLeaf: 0x7ABB4A,
-    oakLeafLight: 0x9ADB66,
-    birchBark: 0xF0EAE0, 
-    birchLeaf: 0xB0E870,
-    daisyWhite: 0xFFD040, heatherPink: 0xFF80C0, fern: 0x4A8848,
-    riverWater: 0xC0EAE0, pondWater: 0x58AACC,
-    rockBase: 0xAAA8B0, rockMoss: 0x6A8850,
-    monarch: 0xFF9030, morpho: 0x60A8FF, swallowtail: 0xFFE840,
-    rabbitWhite: 0xF0E8E0, rabbitPink: 0xFFC0C0,
-    floorWood: 0x9A6840, plaster: 0xFFF4E8, beamDark: 0x604030,
-    bookRed: 0xC03030, bookGreen: 0x408030, bookNavy: 0x284880, bookBrown: 0x9A6840, bookPurple: 0x703090,
-    marble: 0xF0EDE8, sofaPlum: 0x6A4090, rugRed: 0xAA2828, deskOak: 0xAA8850,
-    deckWood: 0x9A7040,
+    // Coizy Primary Palette
+    dirt: 0xFDDBB4,       // Peach
+    grass: 0xC8F0D8,      // Mint
+    sand: 0xFFF0A8,        // Butter
+    grassVar1: 0x7CC8A0,  // Sage
+    grassVar2: 0x60B8E8,  // Sky
+    oceanNear: 0xC2E4FB,  // Baby Blue
+    oceanFar: 0xA898E8,   // Lilac
+    
+    // House & Elements
+    foundation: 0xDDD4F8, // Lavender
+    woodWall: 0xFDDBB4,   // Peach
+    wallPeel: 0xFFF0A8,    // Butter
+    cornerBeam: 0xFF9E6C, // Tangerine
+    thatchTop: 0xF8D4E4,  // Rose Mist
+    thatchBot: 0xE878A8,  // Bubblegum
+    ridgeBeam: 0xA898E8,  // Lilac
+    doorFrame: 0x7CC8A0,  // Sage
+    doorWood: 0xFDDBB4,   // Peach
+    doorHinge: 0xA898E8,  // Lilac
+    doorKnob: 0xF8C840,   // Sunshine
+    windowGlass: 0xC2E4FB,// Baby Blue
+    shutters: 0x7CC8A0,   // Sage
+    
+    // Flora & Misc
+    lavenderBloom: 0xA898E8, // Lilac
+    geranium: 0xEE78A8,   // Bubblegum
+    chimneyBrick: 0xFF9E6C,  // Tangerine
+    chimneyMortar: 0xFDDBB4, // Peach
+    oakBark: 0xFDDBB4,    // Peach 
+    oakLeaf: 0xC8F0D8,    // Mint
+    oakLeafLight: 0x7CC8A0, // Sage
+    birchBark: 0xFFF0A8,  // Butter
+    birchLeaf: 0x7CC8A0,  // Sage
+    daisyWhite: 0xFFF0A8, // Butter
+    heatherPink: 0xF8D4E4,// Rose Mist
+    fern: 0x7CC8A0,       // Sage
+    riverWater: 0xC2E4FB, // Baby Blue
+    pondWater: 0x60B8E8,  // Sky
+    rockBase: 0xDDD4F8,   // Lavender
+    rockMoss: 0xC8F0D8,   // Mint
+    monarch: 0xFF9E6C,    // Tangerine
+    morpho: 0x60B8E8,     // Sky
+    swallowtail: 0xF8C840,// Sunshine
+    rabbitWhite: 0xFFF0A8,// Butter
+    rabbitPink: 0xF8D4E4, // Rose Mist
+    floorWood: 0xFDDBB4,  // Peach
+    plaster: 0xFFF0A8,    // Butter
+    beamDark: 0xFF9E6C,   // Tangerine
+    bookRed: 0xE878A8,    // Bubblegum
+    bookGreen: 0x7CC8A0,  // Sage
+    bookNavy: 0x60B8E8,   // Sky
+    bookBrown: 0xFF9E6C,  // Tangerine
+    bookPurple: 0xA898E8, // Lilac
+    marble: 0xFFF0A8,     // Butter
+    sofaPlum: 0xA898E8,   // Lilac
+    rugRed: 0xE878A8,     // Bubblegum
+    deskOak: 0xFDDBB4,    // Peach
+    deckWood: 0xFDDBB4,   // Peach
 };
 
 // ===========================
@@ -141,13 +174,13 @@ export class WorldBuilder {
         const pos = geo.attributes.position;
         const colors = [];
 
-        // Warna pastel cerah ala Ghibli/Animal Crossing
-        const cSand1 = new THREE.Color('#fcf2c5'), cSand2 = new THREE.Color('#ebd988');
-        const cRock1 = new THREE.Color('#a1ada5'), cRock2 = new THREE.Color('#818e86');
-        const cGrass1 = new THREE.Color('#a5d85a'), cGrass2 = new THREE.Color('#8ac443');
-        const cGrass3 = new THREE.Color('#bce667'); // Highlight rumput
-        const cPeak1 = new THREE.Color('#d1ab82'), cPeak2 = new THREE.Color('#b38b60');
-        const cSwamp = new THREE.Color('#5c7041'); // Warna keruh/rawa
+        // Warna pastel cerah ala Ghibli/Animal Crossing (Coizy Palette)
+        const cSand1 = new THREE.Color('#FFF0A8'), cSand2 = new THREE.Color('#FDDBB4'); // Butter & Peach
+        const cRock1 = new THREE.Color('#DDD4F8'), cRock2 = new THREE.Color('#A898E8'); // Lavender & Lilac
+        const cGrass1 = new THREE.Color('#C8F0D8'), cGrass2 = new THREE.Color('#7CC8A0'); // Mint & Sage
+        const cGrass3 = new THREE.Color('#FFF0A8'); // Highlight Butter
+        const cPeak1 = new THREE.Color('#F8D4E4'), cPeak2 = new THREE.Color('#E878A8'); // Rose Mist & Bubblegum
+        const cSwamp = new THREE.Color('#C2E4FB'); // Baby Blue Rawa
         const finalColor = new THREE.Color();
         for (let i = 0; i < pos.count; i++) {
             const x = pos.getX(i), z = pos.getY(i);
@@ -282,10 +315,10 @@ export class WorldBuilder {
             }
 
             void main() {
-                // Palet warna laut tropis
-                vec3 deepOcean = vec3(0.12, 0.58, 0.88);
-                vec3 shallowOcean = vec3(0.28, 0.85, 0.95);
-                vec3 highlight = vec3(0.9, 0.98, 1.0);
+                // Palet warna laut tropis -> Coizy Pastel
+                vec3 deepOcean = vec3(0.376, 0.722, 0.910);   // Sky: #60B8E8
+                vec3 shallowOcean = vec3(0.761, 0.894, 0.984); // Baby Blue: #C2E4FB
+                vec3 highlight = vec3(1.0, 1.0, 1.0); // White highlight
 
                 // Tekstur koordinat
                 vec2 uvScale = vPos.xy * 0.18;
@@ -323,6 +356,9 @@ export class WorldBuilder {
             depthWrite: true, // Kembali diaktifkan untuk sorting kedalaman yang lebih baik
             side: THREE.DoubleSide
         });
+        
+        // Hindari outline aneh di laut lepas (karena terlalu banyak vertex bergelombang)
+        mat.userData.outlineParameters = { visible: false };
 
         this.ocean = new THREE.Mesh(oceanGeo, mat);
         this.ocean.rotation.x = -Math.PI / 2;
