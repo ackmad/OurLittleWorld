@@ -15,7 +15,7 @@ import gsap from 'gsap';
 import { io } from 'socket.io-client';
 import { WorldBuilder } from './WorldBuilder.js';
 import { NPCManager } from './NPCManager.js';
-import RAPIER from '@dimforge/rapier3d-compat';
+import * as RAPIER from '@dimforge/rapier3d-compat';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
 // ========================
@@ -86,62 +86,38 @@ renderer.toneMappingExposure = 1.6;
 
 // Sky & Fog globals
 let sky, sun;
-scene.fog = new THREE.Fog('#C8E8F5', 150, 500);
-
 function setupSky() {
-  // Step 1: Set clear color renderer sebagai fallback warna langit
-  renderer.setClearColor(new THREE.Color('#87CEEB'), 1.0);
-  
-  // Step 2: Set scene.background sebagai safety net
-  scene.background = new THREE.Color('#87CEEB');
+  scene.background = new THREE.Color(0x8fd4f0);
+  scene.fog = new THREE.Fog(0xb0ddf8, 35, 300);
 
-  // Step 3: Buat sky dome sphere yang sangat besar
-  const skyGeo = new THREE.SphereGeometry(4000, 32, 16);
-  
+  // Still use the sky dome for a beautiful gradient, but update colors to match spec
+  const skyGeo = new THREE.SphereGeometry(2000, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
-    depthWrite: false,      // jangan tulis ke depth buffer
-    depthTest: false,       // jangan test depth — selalu render
     uniforms: {
-      topColor:    { value: new THREE.Color('#4A9ED6') },
-      midColor:    { value: new THREE.Color('#87CEEB') },
-      bottomColor: { value: new THREE.Color('#C8E8F5') },
-      horizon:     { value: 0.0 },
+      topColor:    { value: new THREE.Color(0x8fd4f0) },
+      bottomColor: { value: new THREE.Color(0xb0ddf8) }
     },
     vertexShader: `
       varying vec3 vWorldPos;
       void main() {
         vWorldPos = position;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_Position.z = gl_Position.w; // Force ke far plane
       }
     `,
     fragmentShader: `
       uniform vec3 topColor;
-      uniform vec3 midColor;
       uniform vec3 bottomColor;
       varying vec3 vWorldPos;
       void main() {
         float h = normalize(vWorldPos).y;
-        vec3 col;
-        if (h > 0.15) {
-          float t = (h - 0.15) / 0.85;
-          col = mix(midColor, topColor, pow(clamp(t, 0.0, 1.0), 0.7));
-        } else if (h > -0.05) {
-          float t = (h + 0.05) / 0.20;
-          col = mix(bottomColor, midColor, clamp(t, 0.0, 1.0));
-        } else {
-          col = bottomColor;
-        }
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(0.0, h)), 1.0);
       }
     `
   });
 
   const skyMesh = new THREE.Mesh(skyGeo, skyMat);
   skyMesh.name = "SkyDome";
-  skyMesh.renderOrder = -999;
-  skyMesh.frustumCulled = false;
   scene.add(skyMesh);
   window._skyMesh = skyMesh;
   
@@ -155,32 +131,26 @@ function setupSky() {
 }
 setupSky();
 
-// Lighting — Warm, bright & cozy (Perbaikan 1)
-const ambientLight = new THREE.AmbientLight('#FFF5E0', 1.8);
+// Lighting — Phase 1 Specifications
+const ambientLight = new THREE.AmbientLight(0xb8e0f8, 0.8);
 scene.add(ambientLight);
 
-const sd = 80;
-const sunLight = new THREE.DirectionalLight('#FFF8E7', 3.0);
-sunLight.position.set(80, 120, 60);
+const sd = 120; // Increased shadow area for larger island
+const sunLight = new THREE.DirectionalLight(0xffeebb, 3.5);
+sunLight.position.set(120, 160, 100);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.width = 2048;
-sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.mapSize.setScalar(2048);
 sunLight.shadow.camera.left = -sd;
 sunLight.shadow.camera.right = sd;
 sunLight.shadow.camera.top = sd;
 sunLight.shadow.camera.bottom = -sd;
 sunLight.shadow.camera.near = 0.5;
-sunLight.shadow.camera.far = 200;
-sunLight.shadow.bias = -0.001;
-sunLight.shadow.radius = 8; // soft shadow blur
+sunLight.shadow.camera.far = 250;
+sunLight.shadow.bias = -0.0008;
+sunLight.shadow.radius = 12;
 scene.add(sunLight);
 
-const fillLight = new THREE.DirectionalLight('#FFD080', 1.2);
-fillLight.position.set(-60, 40, -40);
-fillLight.castShadow = false;
-scene.add(fillLight);
-
-const hemiLight = new THREE.HemisphereLight('#C8E8FF', '#8B9B6A', 1.8);
+const hemiLight = new THREE.HemisphereLight(0x8fd4f0, 0xffd180, 0.95);
 scene.add(hemiLight);
 
 // Post Processing — Vignette + Bloom (Bloom strength dinamis via settings)
@@ -336,6 +306,10 @@ scene.add(playerGroup);
 
 function toggleFreeCam() {
   if (!inGame) return;
+  
+  // Jika sedang bertransisi kembali, jangan izinkan toggle spam
+  if (camera.userData.isTransitioning) return;
+  
   isFreeCam = !isFreeCam;
   
   if (isFreeCam) {
@@ -354,15 +328,53 @@ function toggleFreeCam() {
     showNotificationToast("👁️ MATA TUHAN AKTIF (Tombol V untuk kembali)");
     debugLog('📷 CAMERA', 'God Mode: ON');
   } else {
-    // Re-attach to player group
-    playerGroup.add(camera);
-    camera.position.set(0, 1.1, 0); // Standard eye height
-    camera.rotation.set(0, 0, 0);
-    updateCameraRotation();
-    
-    if (playerVisual && !isThirdPerson) playerVisual.visible = false;
     showNotificationToast("✨ Kembali ke tubuh...");
-    debugLog('📷 CAMERA', 'God Mode: OFF');
+    debugLog('📷 CAMERA', 'God Mode: OFF, transisi...');
+    camera.userData.isTransitioning = true;
+    
+    // Simpan state awal kamera saat mode God OFF
+    const startPos = camera.position.clone();
+    const startQuat = camera.quaternion.clone();
+
+    // Buat objek bantuan didalam playerGroup untuk lacak target 3D dinamis
+    const tempTarget = new THREE.Object3D();
+    tempTarget.position.set(0, 1.1, 0);
+    playerGroup.add(tempTarget);
+    
+    // Terapkan rotasi pandangan yaw/pitch default
+    const yawQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw);
+    const pitchQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), cameraPitch);
+    tempTarget.quaternion.copy(yawQuat).multiply(pitchQuat);
+    
+    const proxy = { t: 0 };
+    gsap.to(proxy, {
+      t: 1,
+      duration: 1.2,
+      ease: "power2.inOut",
+      onUpdate: () => {
+        // Kalkulasi posisi target world dinamis di setiap frame
+        const targetPos = new THREE.Vector3();
+        tempTarget.getWorldPosition(targetPos);
+        const targetQuat = new THREE.Quaternion();
+        tempTarget.getWorldQuaternion(targetQuat);
+        
+        // Lerp dari posisi melayang ke posisi karakter
+        camera.position.lerpVectors(startPos, targetPos, proxy.t);
+        camera.quaternion.slerpQuaternions(startQuat, targetQuat, proxy.t);
+      },
+      onComplete: () => {
+        playerGroup.remove(tempTarget);
+        
+        // Pasang kembali (attach) kamera ke kepala player
+        playerGroup.add(camera);
+        camera.position.set(0, 1.1, 0);
+        camera.rotation.set(0, 0, 0);
+        updateCameraRotation();
+        
+        if (playerVisual && !isThirdPerson) playerVisual.visible = false;
+        camera.userData.isTransitioning = false;
+      }
+    });
   }
 }
 
@@ -386,8 +398,8 @@ let isSprint = false, isCrouch = false, isThirdPerson = false;
 let isClimbing = false, ladderObj = null;
 let headBobTimer = 0;
 const moveState = { w: false, a: false, s: false, d: false };
-const gravityForce = -20;
-const jumpForce = 7;
+const gravityForce = -22;
+const jumpForce = 16.5; // Loncat dipertinggi agar lebih terasa impact-nya
 
 // Interaction
 let currentInteractable = null;
@@ -451,6 +463,14 @@ function animate() {
       debugLog('💀 JATUH', 'Player keluar peta, me-respawn...');
       respawnPlayer();
     }
+    // Coordinate UI Update (Perbaikan Permintaan User)
+    const pTr = playerBody.translation();
+    const coordX = document.getElementById('pos-x');
+    const coordY = document.getElementById('pos-y');
+    const coordZ = document.getElementById('pos-z');
+    if (coordX) coordX.textContent = pTr.x.toFixed(1);
+    if (coordY) coordY.textContent = pTr.y.toFixed(1);
+    if (coordZ) coordZ.textContent = pTr.z.toFixed(1);
   }
 
   if (inGame && worldBuilder) worldBuilder.update(time, delta);
@@ -509,6 +529,7 @@ function proceedToWorld(player) {
   gsap.to(uiLayer, { opacity: 0, duration: 1 });
   gsap.to(camera.position, { z: -25, y: 5, duration: 3, ease: 'power2.inOut', onComplete: () => {
     gsap.to('#transition-overlay', { opacity: 1, duration: 1, onComplete: () => {
+      lobbyGroup.visible = false; // HILANGKAN PULAU LOBBY
       initGameEngine(player);
     }});
   }});
@@ -533,7 +554,7 @@ async function initGameEngine(player) {
 
   setLoad(10, 'Menginisialisasi dunia...');
   // Passing the required object structure to satisfy the deprecation warning
-  await RAPIER.init({}); 
+  await RAPIER.init(); 
   setLoad(30, 'Mengatur fisika...');
 
   // Use RAPIER.Vector3 for gravity 
@@ -541,28 +562,29 @@ async function initGameEngine(player) {
   Layers = { TERRAIN: 0x0001, STATIC: 0x0002, DYNAMIC: 0x0004, PLAYER: 0x0008, NPC: 0x0010, TRIGGER: 0x0020 };
 
   setLoad(50, 'Menanam pohon-pohon...');
-  // Player Physics
+  // Player Physics — Near island center
   const playerBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-    .setTranslation(2, 12, 2)
+    .setTranslation(3, 5, 3)
     .setLinearDamping(0.01)
     .setAngularDamping(1.0)
     .lockRotations();
   playerBody = physicsWorld.createRigidBody(playerBodyDesc);
-  const playerColliderDesc = RAPIER.ColliderDesc.capsule(0.85, 0.5) 
+  const playerColliderDesc = RAPIER.ColliderDesc.capsule(0.5, 0.4) 
     .setFriction(0.0)
     .setRestitution(0.0)
-    .setCollisionGroups((Layers.PLAYER << 16) | (Layers.TERRAIN | Layers.STATIC));
+    .setCollisionGroups((Layers.PLAYER << 16) | (0xffff)); // Simple all collide for start
   physicsWorld.createCollider(playerColliderDesc, playerBody);
 
   // === PLAYER VISUAL (untuk Mata Tuhan/Free Cam) ===
   const playerVisGroup = new THREE.Group();
   playerVisGroup.name = "PlayerVisual";
-  const bodyMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1.7, 4, 8), new THREE.MeshStandardMaterial({ color: player.c }));
+  // Reduced size: Radius 0.4, Length 1.0 (Total height 1.8)
+  const bodyMesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.0, 4, 8), new THREE.MeshStandardMaterial({ color: player.c }));
   bodyMesh.position.y = 0; // Centered
   playerVisGroup.add(bodyMesh);
   
-  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 16), new THREE.MeshStandardMaterial({ color: '#ffe0bd' }));
-  headMesh.position.y = 1.1; // Eye level
+  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.38, 16, 16), new THREE.MeshStandardMaterial({ color: '#ffe0bd' }));
+  headMesh.position.y = 0.75; // Skala kepala proporsional
   playerVisGroup.add(headMesh);
   
   playerGroup.add(playerVisGroup);
@@ -581,8 +603,8 @@ async function initGameEngine(player) {
   });
 
   setLoad(90, 'Menghitung bintang...');
-  // Camera Setup — Sejajar dengan mata (eye level)
-  camera.position.set(0, 1.1, 0); 
+  // Camera Setup — Eye level disesuaikan dengan tinggi badan baru
+  camera.position.set(0, 0.7, 0); 
   camera.rotation.set(0, 0, 0);
   camera.fov = 75;
   camera.updateProjectionMatrix();
@@ -741,9 +763,79 @@ function handleInteraction() {
       unlockPointer();
       break;
 
-    case 'door':
-      // Cinematic door soon
-      respawnPlayer(); // temporary teleport
+    case 'door': // INTERACT_DoorMain (pivot group support)
+      const doorGroup = currentInteractable.parent;
+      if (doorGroup && doorGroup.type === 'Group') {
+        const isOpen = doorGroup.userData.isOpen || false;
+        doorGroup.userData.isOpen = !isOpen;
+        gsap.to(doorGroup.rotation, { 
+          y: isOpen ? 0 : -Math.PI / 2, 
+          duration: 0.6, 
+          ease: 'power2.inOut' 
+        });
+        showSpeechBubble(isOpen ? 'Pintu ditutup' : 'Pintu dibuka', 1000);
+      }
+      break;
+
+      break;
+
+    case 'sign':
+      showRoomNameUI(); 
+      break;
+
+    case 'crate':
+      gsap.to(currentInteractable.scale, { x: 1.1, y: 1.1, z: 1.1, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.out' });
+      showSpeechBubble("Membuka peti... 📦");
+      break;
+
+    case 'drum':
+      gsap.to(currentInteractable.scale, { x: 1.05, z: 1.05, duration: 0.15, yoyo: true, repeat: 1 });
+      showNotificationToast("Mengambil air dari drum 💧");
+      break;
+
+    case 'generator':
+      gsap.to(currentInteractable.position, { x: currentInteractable.position.x + 0.05, duration: 0.05, repeat: 10, yoyo: true });
+      showSpeechBubble("Brum... brum... ⚙️", 1500);
+      togglePower();
+      break;
+
+    case 'stump':
+      const axe = scene.getObjectByName('DECO_AxeHandle');
+      if (axe) {
+        gsap.to(axe.rotation, { x: axe.rotation.x - 0.8, duration: 0.2, ease: 'power2.out', onComplete: () => {
+          gsap.to(axe.rotation, { x: axe.rotation.x + 0.8, duration: 0.3, ease: 'bounce.out' });
+        }});
+        showSpeechBubble("Tok! +1 Log 🪵", 800);
+      }
+      break;
+
+    case 'bench':
+      if (playerState === 'sitting_bench') {
+        playerState = 'idle';
+        showSpeechBubble("Berdiri...");
+      } else {
+        playerState = 'sitting_bench';
+        sittingObj = currentInteractable;
+        showSpeechBubble("Beristirahat sebentar... 🧘", 2000);
+        const pos = currentInteractable.getWorldPosition(new THREE.Vector3());
+        playerBody.setTranslation({ x: pos.x, y: pos.y + 0.5, z: pos.z }, true);
+      }
+      break;
+
+    case 'pond':
+      showSpeechBubble("Mulai memancing... 🎣", 3000);
+      break;
+
+    case 'rooftop_chair':
+      if (playerState === 'sitting_rooftop') playerState = 'idle';
+      else {
+        playerState = 'sitting_rooftop';
+        sittingObj = currentInteractable;
+        const pos = currentInteractable.getWorldPosition(new THREE.Vector3());
+        playerBody.setTranslation({ x: pos.x, y: pos.y + 0.5, z: pos.z }, true);
+        if (Object.keys(peers).length > 0) showSpeechBubble("Momen yang indah... ✨", 4000);
+        else showSpeechBubble("Pemandangan yang indah... ✨");
+      }
       break;
 
     case 'cat':
@@ -805,21 +897,30 @@ function handleInteraction() {
       unlockPointer();
       break;
 
-    case 'rooftop_chair':
-      if (playerState === 'sitting_rooftop') playerState = 'idle';
-      else {
-        playerState = 'sitting_rooftop';
-        sittingObj = currentInteractable;
-        // Moment Check (Simplified: logic based on presence of peers)
-        if (Object.keys(peers).length > 0) showSpeechBubble("Momen yang indah... ✨", 4000);
-      }
-      break;
-
     case 'ladder':
        const p = playerBody.translation();
        const targetY = p.y < 5 ? p.y + 4.5 : p.y - 4.5;
        playerBody.setTranslation({ x: p.x, y: targetY, z: p.z }, true);
        break;
+  }
+}
+
+function togglePower() {
+  const light = scene.getObjectByName('LIGHT_Interior');
+  if (light) {
+    const isOn = light.intensity > 0.1;
+    gsap.to(light, { intensity: isOn ? 0.0 : 1.5, duration: 0.5 });
+    showNotificationToast(isOn ? "Listrik mati... 🌑" : "Listrik menyala! 💡");
+  }
+}
+
+function showRoomNameUI() {
+  const dialog = document.getElementById('carve-dialog');
+  if (dialog) {
+    dialog.querySelector('h3').textContent = "Papan Nama Rumah 🏘️";
+    dialog.querySelector('p').textContent = "Beri nama khusus untuk rumah kita...";
+    dialog.classList.remove('hidden');
+    unlockPointer();
   }
 }
 
@@ -916,47 +1017,111 @@ function createSparkle(pos) {
 }
 
 function throwStone() {
-  if (playerState !== 'idle') return;
-  // Perbaikan 4: Splash system (Simplified for MVP)
-  const stone = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshStandardMaterial({ color: '#888' }));
+  if (playerState !== 'idle' || !inGame) return;
+  
+  const stone = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(0.18, 0), 
+    new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 })
+  );
+  
   const pPos = new THREE.Vector3();
   camera.getWorldPosition(pPos);
   const pDir = new THREE.Vector3();
   camera.getWorldDirection(pDir);
   
-  stone.position.copy(pPos).add(pDir.clone().multiplyScalar(0.5));
+  stone.position.copy(pPos).add(pDir.clone().multiplyScalar(0.8));
+  stone.castShadow = true;
   scene.add(stone);
   
-  const vel = pDir.multiplyScalar(15);
-  vel.y += 5; // arc
+  // Physics Logic (Simple Projectile with Ground/Water detection)
+  let stoneVel = pDir.clone().multiplyScalar(24);
+  stoneVel.y += 7; // arc upwards
   
-  let stonePos = stone.position.clone();
-  let stoneVel = vel.clone();
+  let currentPos = stone.position.clone();
   
-  const interval = setInterval(() => {
-    stoneVel.y -= 0.5; // gravity
-    stonePos.add(stoneVel.clone().multiplyScalar(0.016));
-    stone.position.copy(stonePos);
+  function updateStone() {
+    const dt = 0.016;
+    stoneVel.y -= 25 * dt; // gravity
+    currentPos.add(stoneVel.clone().multiplyScalar(dt));
+    stone.position.copy(currentPos);
     
-    if (stonePos.y < 0.1) {
-      clearInterval(interval);
-      // Splash effect
-      createSplash(stonePos.clone());
+    // Check collision
+    const groundY = worldBuilder ? worldBuilder.getHeight(currentPos.x, currentPos.z) + 0.15 : -10;
+    const oceanY = worldBuilder?.ocean ? worldBuilder.ocean.position.y : -6;
+    
+    // Water Hit
+    if (currentPos.y < oceanY + 0.2) {
+      createEffect(currentPos.clone(), 'water');
       scene.remove(stone);
+      socket?.emit('interaction', { type: 'stone_splash', x: currentPos.x, z: currentPos.z });
+      return;
     }
-  }, 16);
+    
+    // Ground Hit
+    // Check if on land (island domain is roughly 64x52)
+    if (currentPos.y < groundY && Math.abs(currentPos.x) < 32 && Math.abs(currentPos.z) < 26) {
+      createEffect(currentPos.clone(), 'ground');
+      scene.remove(stone);
+      return;
+    }
+    
+    // Fall out of bounds
+    if (currentPos.y < -50) {
+      scene.remove(stone);
+      return;
+    }
+    
+    requestAnimationFrame(updateStone);
+  }
   
-  setTimeout(() => { clearInterval(interval); scene.remove(stone); }, 3000);
+  updateStone();
 }
 
-function createSplash(pos) {
-  const splash = new THREE.Points(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0)]),
-    new THREE.PointsMaterial({ color: '#A8D4C8', size: 0.5 })
-  );
-  splash.position.copy(pos);
-  scene.add(splash);
-  setTimeout(() => scene.remove(splash), 500);
+function createEffect(pos, type) {
+  const count = type === 'water' ? 12 : 8;
+  const color = type === 'water' ? 0x80d8ff : 0x8D7B6D;
+  const size = type === 'water' ? 0.2 : 0.15;
+  
+  const group = new THREE.Group();
+  scene.add(group);
+  
+  for(let i=0; i<count; i++) {
+    const p = new THREE.Mesh(
+      new THREE.SphereGeometry(size * (0.5 + Math.random()), 6, 4),
+      new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.8 })
+    );
+    p.position.copy(pos);
+    group.add(p);
+    
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 4;
+    const vX = Math.cos(angle) * speed * 0.5;
+    const vZ = Math.sin(angle) * speed * 0.5;
+    const vY = 3 + Math.random() * 5;
+    
+    gsap.to(p.position, {
+      x: pos.x + vX,
+      y: pos.y + vY,
+      z: pos.z + vZ,
+      duration: 0.6 + Math.random() * 0.4,
+      ease: 'power1.out'
+    });
+    
+    gsap.to(p.position, {
+      y: pos.y - 1, // fall back
+      delay: 0.4,
+      duration: 0.4,
+      ease: 'power1.in'
+    });
+    
+    gsap.to(p.material, {
+      opacity: 0,
+      duration: 0.8,
+      onComplete: () => {
+        if (i === count - 1) scene.remove(group);
+      }
+    });
+  }
 }
 
 // ========================
@@ -1013,9 +1178,9 @@ function updatePhysics(delta, time) {
     playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
   }
 
-  // Sync player group XZ (Y digeser sesuai offset kaki badan baru)
+  // Sync player group XZ & Y (Langsung mengikuti titik pusat kapsul fisika)
   if (playerState === 'idle') {
-    playerGroup.position.set(pTrans.x, pTrans.y - 1.35, pTrans.z);
+    playerGroup.position.set(pTrans.x, pTrans.y, pTrans.z);
   } else if (playerState === 'leaning' && sittingObj) {
     // Stick to tree
     const targetPos = sittingObj.getWorldPosition(new THREE.Vector3());
@@ -1032,9 +1197,10 @@ function updatePhysics(delta, time) {
     playerGroup.position.lerp(targetPos.clone().add(new THREE.Vector3(0, -0.2, 0)), delta * 5);
   }
 
-  // Ground detection — Jarak ditingkatkan karena badan lebih tinggi
+  // Ground detection — Jarak disesuaikan dengan kapsul yang lebih pendek
+  // Pindah ray collision mask agar tidak memantul ke collider badan pemain (0x0008)
   const rayDown = new RAPIER.Ray({ x: pTrans.x, y: pTrans.y, z: pTrans.z }, { x: 0, y: -1, z: 0 });
-  const hit = physicsWorld.castRayAndGetNormal(rayDown, 1.6, true, Layers.PLAYER, Layers.TERRAIN | Layers.STATIC);
+  const hit = physicsWorld.castRayAndGetNormal(rayDown, 1.25, true, undefined, undefined, undefined, playerBody);
 
   let slopeAngleDeg = 0;
   if (hit && hit.toi < 1.45) { // Toleransi hit lebih besar
@@ -1208,14 +1374,24 @@ function updatePhysics(delta, time) {
         document.getElementById('prompt-text').textContent = o.userData.label;
         promptUI.style.opacity = '1';
         if (promptObj) promptObj.position.copy(hits[0].point);
+        // Change cursor to pointer if not locked (or useful for mouse users)
+        if (!isPointerLocked) document.body.style.cursor = 'pointer';
       } else {
         currentInteractable = null;
         promptUI.style.opacity = '0';
+        if (!isPointerLocked) document.body.style.cursor = 'default';
       }
     } else {
       currentInteractable = null;
       if (promptUI) promptUI.style.opacity = '0';
+      if (!isPointerLocked) document.body.style.cursor = 'default';
     }
+  }
+
+  // Ocean Bobbing (Visual Polish Fase 5)
+  const ocean = scene.getObjectByName('ENV_Ocean');
+  if (ocean) {
+    ocean.position.y = -5.0 + Math.sin(performance.now() * 0.001) * 0.1;
   }
 
   // Compass — gunakan cameraYaw langsung
@@ -1437,8 +1613,8 @@ function loadSettings() {
 }
 
 function applySettings(sets) {
-  renderer.toneMappingExposure = parseFloat(sets.bright) || 1.6;
-  bloomPass.strength = sets.bloom ? 0.25 : 0.0;
+  renderer.toneMappingExposure = parseFloat(sets.bright) || 1.4;
+  bloomPass.strength = sets.bloom ? 0.45 : 0.0;
   
   // Jangan ubah camera.far dari settings draw distance
   // Draw distance hanya mempengaruhi fog density saja
