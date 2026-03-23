@@ -92,7 +92,7 @@ export class WorldBuilder {
         this.physicsWorld = physicsWorld;
         this.Layers = Layers;
         this.terrainMesh = null;
-        this.houseBuilder = new HouseBuilder(gameGroup, interactables, physicsWorld, RAPIER);
+        this.houseBuilder = new HouseBuilder(this.gameGroup, this.interactables, this.physicsWorld, this.RAPIER, this.Layers);
         _seed = 42;
     }
 
@@ -256,7 +256,9 @@ export class WorldBuilder {
         for (let i = 0; i < pos.count; i++) {
             vertices[i*3] = pos.getX(i); vertices[i*3+1] = pos.getZ(i) + 0.15; vertices[i*3+2] = -pos.getY(i);
         }
-        this.physicsWorld.createCollider(this.RAPIER.ColliderDesc.trimesh(vertices, indices));
+        const collider = this.physicsWorld.createCollider(this.RAPIER.ColliderDesc.trimesh(vertices, indices));
+        // Lapisan TERRAIN (0x0001) dan bertabrakan dengan segalanya (0xffff)
+        collider.setCollisionGroups((this.Layers.TERRAIN << 16) | 0xffff);
 
         this.buildIslandBottom();
     }

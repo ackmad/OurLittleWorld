@@ -115,10 +115,12 @@ io.on('connection', (socket) => {
     callback({ success: true, roomCode: code, player, others });
 
     // Auto memory: both online together
-    if (Object.keys(rooms[code].players).length === 2) {
-      const mem = saveMemory(code, 'together', `${Object.values(rooms[code].players).map(p=>p.name).join(' & ')} online bersama`);
-      io.to(code).emit('memory_created', mem);
-    }
+    // Auto memory: both online together — DIMATIKAN SEMENTARA karena bikin spam
+    // if (Object.keys(rooms[code].players).length === 2 && !rooms[code].togetherLogged) {
+    //   const mem = saveMemory(code, 'together', `${Object.values(rooms[code].players).map(p=>p.name).join(' & ')} online bersama`);
+    //   rooms[code].togetherLogged = true;
+    //   io.to(code).emit('memory_created', mem);
+    // }
   });
 
   // ── Player Move ──

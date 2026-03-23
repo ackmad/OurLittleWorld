@@ -277,7 +277,9 @@ function setupPointerLock() {
   const canvas = renderer.domElement;
 
   canvas.addEventListener('click', () => {
-    if (!inGame) return;
+    // Diizinkan meminta lock jika di dalam game ATAU saat sedang melakukan transisi masuk (entering)
+    // guna mendapatkan 'user gesture' seawal mungkin.
+    if (!inGame && !isEntering) return;
     canvas.requestPointerLock();
     debugLog('🖱️ POINTER LOCK', 'Meminta pointer lock ke browser...');
   });
@@ -498,6 +500,7 @@ function respawnPlayer() {
   if (playerBody) {
     playerBody.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
     playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    playerBody.wakeUp(); // Pastikan bodi tidak dalam mode tidur (sleeping) agar gravitasi bisa bekerja
   }
   
   currentVel.set(0, 0, 0);
@@ -621,8 +624,10 @@ passcodeIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLog
 function handleLogin() {
   const c = passcodeIn.value.trim();
   if (c === '220108') {
+    lockPointer(); // Trigger Pointer Lock seawal mungkin dari gesture klik/enter
     proceedToWorld({ n: 'Elfan', c: '#4da6ff' });
   } else if (c === '150108') {
+    lockPointer();
     proceedToWorld({ n: 'Savira', c: '#ff66b2' });
   } else {
     loginAttempts++;
@@ -645,11 +650,13 @@ function proceedToWorld(player) {
   
   // Zoom camera ke pulau lalu masuk
   gsap.to(uiLayer, { opacity: 0, duration: 0.8 });
+  
+  // PARAREL: Mulai inisialisasi engine di background agar saat animasi selesai, game sudah siap.
+  // Pemicu dimulainya dunia diatur di dalam initGameEngine
+  initGameEngine(player);
+
   gsap.to(camera.position, { z: -25, y: 5, duration: 3, ease: 'power2.inOut', onComplete: () => {
-    gsap.to('#transition-overlay', { opacity: 1, duration: 1, onComplete: () => {
-      lobbyGroup.visible = false; // HILANGKAN PULAU LOBBY
-      initGameEngine(player);
-    }});
+    // Zoom selesai, tinggal menunggu initGameEngine menyelesaikan transisinya sendiri
   }});
 }
 
@@ -672,8 +679,9 @@ async function initGameEngine(player) {
   };
 
   setLoad(10, 'Menginisialisasi dunia...');
-  // Passing the required object structure to satisfy the deprecation warning
-  await RAPIER.init(); 
+  // Menghilangkan warning deprecation secara paksa dengan unbinding call
+  const rapierInit = RAPIER.init;
+  await rapierInit(); 
   setLoad(30, 'Mengatur fisika...');
 
   // Use RAPIER.Vector3 for gravity 
@@ -842,6 +850,7 @@ async function initGameEngine(player) {
       loadingScreen.classList.add('hidden');
       loadingScreen.style.opacity = ''; // reset for next time
       gameGroup.visible = true;
+      lobbyGroup.visible = false; // Pastikan pulau lobby hilang saat masuk game
       document.getElementById('game-hud').classList.remove('hidden');
       document.body.classList.add('in-game');
       inGame = true;
@@ -1119,7 +1128,8 @@ function saveStarName() {
     localStorage.setItem('coizy_stars', JSON.stringify(starNames));
     addStarLabel(starTarget, text);
     showNotificationToast("Bintang telah diberi nama! 🌟");
-    socket?.emit('interaction', { type: 'star_named', starId: id, name: text });
+    // Perbaikan Trigger: Sesuaikan type agar sinkron dengan yang diharapkan backend (named_star)
+    socket?.emit('interaction', { type: 'named_star', starId: id, starName: text });
   }
   document.getElementById('star-dialog').classList.add('hidden');
   lockPointer();
@@ -1341,10 +1351,10 @@ function updatePhysics(delta, time) {
   
   const pTrans = playerBody.translation();
 
-  // Bug 1 Fix: Ground Snap Safety Net
+  // Bug 1 Fix: Ground Snap Safety Net (Dipertajam agar tidak nyangkut terus-menerus)
   const gHeight = worldBuilder ? worldBuilder.getHeight(pTrans.x, pTrans.z) : -10;
-  if (pTrans.y < gHeight - 0.5) {
-    playerBody.setTranslation({ x: pTrans.x, y: gHeight + 1.5, z: pTrans.z }, true);
+  if (pTrans.y < gHeight - 3.0) { // Lebih toleran agar gravitasi punya waktu bekerja
+    playerBody.setTranslation({ x: pTrans.x, y: gHeight + 1.2, z: pTrans.z }, true);
     playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
   }
 
@@ -1469,10 +1479,11 @@ function updatePhysics(delta, time) {
   if (isGrounded && !isClimbing && moveDir.lengthSq() > 0.01) {
     const rp = { x: pTrans.x, y: pTrans.y - 0.5, z: pTrans.z };
     const rd = { x: moveDir.x, y: 0, z: moveDir.z };
-    const wallHit = physicsWorld.castRay(new RAPIER.Ray(rp, rd), 0.5, true, Layers.PLAYER, Layers.TERRAIN | Layers.STATIC);
+    // Hit TERRAIN (0x0001) atau STATIC (0x0002)
+    const wallHit = physicsWorld.castRay(new RAPIER.Ray(rp, rd), 0.5, true, (Layers.TERRAIN | Layers.STATIC), undefined, undefined, playerBody);
     if (wallHit) {
       const rp2 = { x: pTrans.x, y: pTrans.y - 0.25, z: pTrans.z };
-      const topHit = physicsWorld.castRay(new RAPIER.Ray(rp2, rd), 0.5, true, Layers.PLAYER, Layers.TERRAIN | Layers.STATIC);
+      const topHit = physicsWorld.castRay(new RAPIER.Ray(rp2, rd), 0.5, true, (Layers.TERRAIN | Layers.STATIC), undefined, undefined, playerBody);
       if (!topHit) playerBody.setTranslation({ x: pTrans.x, y: pTrans.y + 0.15, z: pTrans.z }, true);
     }
   }

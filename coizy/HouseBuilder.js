@@ -15,11 +15,12 @@ import * as THREE from 'three';
 // ============================================================
 
 export class HouseBuilder {
-    constructor(gameGroup, interactables, physicsWorld, RAPIER) {
+    constructor(gameGroup, interactables, physicsWorld, RAPIER, Layers) {
         this.gameGroup    = gameGroup;
         this.interactables = interactables;
         this.physicsWorld = physicsWorld;
         this.RAPIER       = RAPIER;
+        this.Layers       = Layers;
 
         // Sistem smoke particles — diupdate tiap frame
         this.smokeParticles = [];
@@ -744,52 +745,51 @@ export class HouseBuilder {
             R.RigidBodyDesc.fixed().setTranslation(px, py+b+2.1, pz)
         );
         // Dinding Depan (DIKOREKSI kearah X=0 pintu)
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.975,2.1,0.12).setTranslation(-1.675,0,-2.42), mb);
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.975,2.1,0.12).setTranslation( 1.675,0,-2.42), mb);
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.7,0.6,0.12).setTranslation(0,1.5,-2.42), mb);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.975,2.1,0.12).setTranslation(-1.675,0,-2.42), mb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.975,2.1,0.12).setTranslation( 1.675,0,-2.42), mb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.7,0.6,0.12).setTranslation(0,1.5,-2.42), mb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
         
         // Dinding Lain
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(2.65,2.1,0.12).setTranslation(0,0,2.42),   mb);
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.12,2.1,2.42).setTranslation(-2.65,0,0),  mb);
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.12,2.1,2.42).setTranslation(2.65,0,0),   mb);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(2.65,2.1,0.12).setTranslation(0,0,2.42),   mb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.12,2.1,2.42).setTranslation(-2.65,0,0),  mb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.12,2.1,2.42).setTranslation(2.65,0,0),   mb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
 
         // Lantai rumah
         const fBody = this.physicsWorld.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(px, py+b, pz));
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(3.4, 0.1, 2.7), fBody);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(3.4, 0.1, 2.7), fBody).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
 
-        // Pintu Utama Kinematic Physics (Agar tidak tembus saat ditutup dan bisa update rotasi saat dibuka)
+        // Pintu Utama Kinematic Physics
         this.doorRB = this.physicsWorld.createRigidBody(
             R.RigidBodyDesc.kinematicPositionBased().setTranslation(px - 0.6, py + b, pz - 2.43)
         );
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.6, 1.3, 0.05).setTranslation(0.6, 1.3, 0), this.doorRB);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.6, 1.3, 0.05).setTranslation(0.6, 1.3, 0), this.doorRB).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
 
         // Lantai teras expanded
         const pb = this.physicsWorld.createRigidBody(
             R.RigidBodyDesc.fixed().setTranslation(px, py+b, pz-5.0)
         );
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(4.7,0.08,2.6), pb);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(4.7,0.08,2.6), pb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
 
-        // --- PHYSICS PAGAR & TERAS (Anti-tembus oleh player) ---
+        // --- PHYSICS PAGAR & TERAS ---
         const fenceBody = this.physicsWorld.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(px, py+b+0.6, pz));
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 0.6, 2.5).setTranslation(-4.6, 0, -4.75), fenceBody); // Kiri
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 0.6, 2.5).setTranslation( 4.7, 0, -4.75), fenceBody); // Kanan
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(1.5, 0.6, 0.1).setTranslation(-3.1, 0, -7.2), fenceBody);  // Depan Kiri
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(1.5, 0.6, 0.1).setTranslation( 3.2, 0, -7.2), fenceBody);  // Depan Kanan
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 0.6, 2.5).setTranslation(-4.6, 0, -4.75), fenceBody).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 0.6, 2.5).setTranslation( 4.7, 0, -4.75), fenceBody).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(1.5, 0.6, 0.1).setTranslation(-3.1, 0, -7.2), fenceBody).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(1.5, 0.6, 0.1).setTranslation( 3.2, 0, -7.2), fenceBody).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
 
         // Tangga (Wider 3.0)
         const numS = 10;
         for (let i = 0; i < numS; i++) {
-            // Samakan dengan visual
             const sy = b - (i + 1) * (b/numS);
             const sz = -7.5 - (i * 0.5);
             const sb = this.physicsWorld.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(px, py+sy, pz+sz));
-            this.physicsWorld.createCollider(R.ColliderDesc.cuboid(1.5, 0.1, 0.28), sb);
+            this.physicsWorld.createCollider(R.ColliderDesc.cuboid(1.5, 0.1, 0.28), sb).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
         }
 
-        // --- WALL DI SAMPING TANGGA (Agar pemain tidak jatuh menyamping) ---
+        // --- WALL DI SAMPING TANGGA ---
         const stairsWall = this.physicsWorld.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(px, py+b/2, pz-10.0));
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 1.5, 2.8).setTranslation(-1.75, 0, 0), stairsWall);
-        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 1.5, 2.8).setTranslation( 1.75, 0, 0), stairsWall);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 1.5, 2.8).setTranslation(-1.75, 0, 0), stairsWall).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
+        this.physicsWorld.createCollider(R.ColliderDesc.cuboid(0.1, 1.5, 2.8).setTranslation( 1.75, 0, 0), stairsWall).setCollisionGroups((this.Layers.STATIC << 16) | 0xffff);
 
         console.log('⚙️ PHYSICS: Collider rumah panggung v5 (Refined) selesai');
     }
