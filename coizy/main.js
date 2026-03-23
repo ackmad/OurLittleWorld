@@ -52,8 +52,15 @@ const MOUSE_SENSITIVITY = 0.002;
 
 // === PERBAIKAN 3: SISTEM DEBUG ===
 const DEBUG_MODE = true;
+const lastLogMessage = new Map();
 function debugLog(kategori, pesan, data = null) {
   if (!DEBUG_MODE) return;
+  
+  // Hanya log jika pesan berubah (mencegah spam)
+  const key = `${kategori}:${pesan}`;
+  if (lastLogMessage.get(key) === JSON.stringify(data)) return;
+  lastLogMessage.set(key, JSON.stringify(data));
+
   const waktu = performance.now().toFixed(0);
   const prefix = `[${waktu}ms]`;
   if (data) console.log(`${prefix} ${kategori} ${pesan}`, data);
@@ -537,7 +544,8 @@ function animate() {
     updatePhysics(delta, time);
     updateCameraRotation(); // PERBAIKAN 2
     
-    // === PERBAIKAN 4: DEBUG PHYSICS BERKALA ===
+    // === PERBAIKAN 4: DEBUG PHYSICS BERKALA (Dinonaktifkan demi performa) ===
+    /*
     debugFrameCounter++;
     if (debugFrameCounter % 120 === 0) {
       const pTrans = playerBody.translation();
@@ -548,6 +556,7 @@ function animate() {
       console.log(`   Yaw: ${degYaw.toFixed(1)}° | Pitch: ${degPitch}°`);
       console.log('─────────────────────────────────────');
     }
+    */
 
     // Safety check falls
     const pTrans = playerBody.translation();
@@ -768,7 +777,7 @@ async function initGameEngine(player) {
   setLoad(70, 'Membangun dunia...');
   worldBuilder = new WorldBuilder(scene, gameGroup, interactables, RAPIER, physicsWorld, Layers);
   worldBuilder.npcManager = npcManager;
-  npcManager.worldBuilder = worldBuilder;
+  npcManager.world = worldBuilder;
   await worldBuilder.build((progress) => {
     setLoad(70 + progress * 0.2, `Membangun dunia... ${Math.floor(progress)}%`);
   });
@@ -1021,6 +1030,12 @@ function handleInteraction() {
       showSpeechBubble("Purrr... 🐈");
       currentInteractable.userData.isBeingPet = true;
       createSparkle(currentInteractable.position.clone().add(new THREE.Vector3(0, 0.4, 0)));
+      break;
+
+    case 'rabbit':
+      showSpeechBubble("Kelinci terlihat senang! 🐰");
+      currentInteractable.userData.isBeingPet = true;
+      createSparkle(currentInteractable.position.clone().add(new THREE.Vector3(0, 0.3, 0)));
       break;
       
     case 'beach_stone':
@@ -1433,6 +1448,23 @@ function updatePhysics(delta, time) {
   // Kecepatan dinaikkan: lari jauh lebih cepat daripada jalan
   let speed = isSprint ? 12.0 : (isCrouch ? 2.0 : 6.0);
 
+  // Model Rotation — Arahkan karakter ke arah jalan
+  if (playerVisual) {
+    let targetAngle = playerVisual.rotation.y;
+    if (moveDir.lengthSq() > 0.01) {
+      // HADAP JALAN: Jika bergerak, hadap ke arah vector gerakan
+      targetAngle = Math.atan2(moveDir.x, moveDir.z);
+    } else {
+      // HADAP KAMERA: Jika diam, hadap ke arah kamera (belakangi view)
+      targetAngle = cameraYaw + Math.PI;
+    }
+    
+    // Shortest path interpolation
+    let diff = targetAngle - playerVisual.rotation.y;
+    diff = ((diff + Math.PI) % (Math.PI * 2)) - Math.PI;
+    playerVisual.rotation.y += diff * 0.15;
+  }
+
   // Slope slide
   if (isGrounded && slopeAngleDeg > 45 && slopeAngleDeg < 70 && hit) {
     const slidePush = new THREE.Vector3(hit.normal1.x, 0, hit.normal1.z).normalize().multiplyScalar(speed * 0.8);
@@ -1591,7 +1623,6 @@ function updatePhysics(delta, time) {
   // ======= AKHIR DARI FUNGSI updatePhysics =======
   // Animasi karakter lokal — setiap frame
   if (playerVisual && inGame) {
-    playerVisual.rotation.y = Math.PI;
     const isMoving = !!(moveState.w || moveState.a || moveState.s || moveState.d);
     animateLimbs(playerVisual, isMoving ? 1.0 : 0.0, time * 0.001);
   }
@@ -1648,7 +1679,7 @@ function updatePhysics(delta, time) {
 
     if (isMovingLocally) {
       // HADAP JALAN
-      targetAngle = Math.atan2(moveDx, moveDz) + Math.PI;
+      targetAngle = Math.atan2(moveDx, moveDz);
     } else if (peer.targetRot !== undefined) {
       // HADAP KAMERA
       targetAngle = peer.targetRot + Math.PI;
@@ -1715,10 +1746,10 @@ function onKeyDown(e) {
   }
 
   switch (k) {
-    case 'w': moveState.w = true; debugLog('🟢 GERAK', 'Maju'); break;
-    case 's': moveState.s = true; debugLog('🔴 GERAK', 'Mundur'); break;
-    case 'a': moveState.a = true; debugLog('🟡 GERAK', 'Kiri'); break;
-    case 'd': moveState.d = true; debugLog('🟡 GERAK', 'Kanan'); break;
+    case 'w': if(!moveState.w) debugLog('🟢 GERAK', 'Maju'); moveState.w = true; break;
+    case 's': if(!moveState.s) debugLog('🔴 GERAK', 'Mundur'); moveState.s = true; break;
+    case 'a': if(!moveState.a) debugLog('🟡 GERAK', 'Kiri'); moveState.a = true; break;
+    case 'd': if(!moveState.d) debugLog('🟡 GERAK', 'Kanan'); moveState.d = true; break;
     case ' ': 
       if (isGrounded) debugLog('⬆️ LONCAT', 'Melompat!');
       jumpBufferTimer = 0.2; 

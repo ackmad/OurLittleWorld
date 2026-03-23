@@ -66,6 +66,7 @@ export class HouseBuilder {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._mat(col, o));
         mesh.castShadow    = o.sh ?? true;
         mesh.receiveShadow = o.sh ?? true;
+        mesh.name = o.name ?? 'ENV_Solid';
         return mesh;
     }
 
@@ -73,6 +74,7 @@ export class HouseBuilder {
         const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), this._mat(col, o));
         mesh.castShadow    = o.sh ?? true;
         mesh.receiveShadow = o.sh ?? true;
+        mesh.name = o.name ?? 'ENV_Solid';
         return mesh;
     }
 
@@ -80,6 +82,7 @@ export class HouseBuilder {
         const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, seg, seg), this._mat(col, o));
         mesh.castShadow    = o.sh ?? true;
         mesh.receiveShadow = o.sh ?? true;
+        mesh.name = o.name ?? 'ENV_Solid';
         return mesh;
     }
 

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { HouseBuilder } from './HouseBuilder.js';
+import { createCatModel } from './CatModel.js';
+import { createRabbitModel } from './RabbitModel.js';
+import { createButterflyModel } from './ButterflyModel.js';
 
 // ===========================
 //  COLOUR PALETTE — Brighter
@@ -248,7 +251,7 @@ export class WorldBuilder {
         this.terrainMesh.rotation.x = -Math.PI / 2;
         this.terrainMesh.position.y = 0.15;
         this.terrainMesh.receiveShadow = true;
-        this.terrainMesh.name = 'ENV_FloatingIsland';
+        this.terrainMesh.name = 'ENV_SolidTerrain';
         this.gameGroup.add(this.terrainMesh);
 
         const vertices = new Float32Array(pos.count * 3);
@@ -552,7 +555,85 @@ export class WorldBuilder {
     }
 
     buildFauna() {
-        // Butterflies
+        // ── Chibi Cats ────────────────────────────────────────────────
+        // Spawn positions: one near the dock area, one near the house
+        const catSpawns = [
+            { x: -8,  z: 12  },  // Near left oak tree area
+            { x:  6,  z: -8  },  // Near front of house stairs
+        ];
+
+        catSpawns.forEach(({ x, z }) => {
+            const y = this.getHeight(x, z) + 0.15;
+            const cat = createCatModel(this.scene);
+            cat.root.position.set(x, y, z);
+
+            // Random initial facing direction
+            cat.root.rotation.y = Math.random() * Math.PI * 2;
+
+            this.gameGroup.add(cat.root);
+
+            // Register with interactables so raycaster can detect
+            this.interactables.push(cat.root);
+
+            // Register with NPC Manager for AI behaviour
+            if (this.npcManager) {
+                this.npcManager.setupCat(cat.root);
+            }
+
+            // Store the update function so main.js can call it each frame
+            cat.root.userData.updateCat = cat.update;
+            cat.root.userData.label     = '[E] Elus Kucing';
+            cat.root.userData.type      = 'cat';
+        });
+
+        // ── Chibi Rabbits ─────────────────────────────────────────────
+        const rabbitSpawns = [
+            { x: -18, z: -10 }, // Swamp area
+            { x:  15, z:  15 }, // Near hills
+            { x: -28, z:   5 }, // Beach side
+        ];
+
+        rabbitSpawns.forEach(({ x, z }) => {
+            const y = this.getHeight(x, z) + 0.44;
+            const rabbit = createRabbitModel(this.scene);
+            rabbit.root.position.set(x, y, z);
+            rabbit.root.userData.stateMachine.homePos.set(x, y, z);
+            
+            this.gameGroup.add(rabbit.root);
+            this.interactables.push(rabbit.root);
+
+            if (this.npcManager) {
+                this.npcManager.setupRabbit(rabbit.root);
+            }
+
+            rabbit.root.userData.updateRabbit = rabbit.update;
+            rabbit.root.userData.label = '[E] Dekati Kelinci';
+            rabbit.root.userData.type  = 'rabbit';
+        });
+
+        // ── Chibi Butterflies ─────────────────────────────────────────
+        const variants = ['monarch', 'morpho', 'swallowtail', 'rose', 'emerald'];
+        for(let i=0; i<6; i++) {
+            const variant = variants[Math.floor(Math.random() * variants.length)];
+            const b = createButterflyModel(this.scene, variant);
+            
+            // Random start position
+            const x = (Math.random()-0.5)*40;
+            const z = (Math.random()-0.5)*40;
+            const y = this.getHeight(x, z) + 2 + Math.random()*3;
+            
+            b.root.position.set(x, y, z);
+            b.root.userData.homePos.set(x, y, z);
+            
+            this.gameGroup.add(b.root);
+            
+            if (this.npcManager) {
+                this.npcManager.setupButterfly(b.root);
+            }
+
+            b.root.userData.updateButterfly = b.update;
+            b.root.userData.type = 'butterfly';
+        }
     }
 
     buildRooftop(hGroup) {
