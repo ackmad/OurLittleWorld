@@ -92,8 +92,7 @@ io.on('connection', (socket) => {
   socket.on('join_room', ({ roomCode, name, color }, callback) => {
     const code = roomCode.toUpperCase().trim();
     if (!rooms[code]) {
-      callback({ success: false, error: 'Room not found.' });
-      return;
+      rooms[code] = { players: {} }; // Auto-create room if it doesn't exist (Fix Sinkronisasi Multiplayer)
     }
     if (Object.keys(rooms[code].players).length >= 2) {
       callback({ success: false, error: 'Room sudah penuh (max 2 pemain).' });

@@ -19,14 +19,17 @@ import { NPCManager } from './NPCManager.js';
 import * as RAPIER from '@dimforge/rapier3d-compat';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 5000);
+
 // ========================
 // GLOBAL STATE
 // ========================
 let inGame = false;
-let worldBuilder, socket;
+let worldBuilder, socket, localPlayerData;
 let physicsWorld, Layers;
 let playerBody;
 const peers = {};
+window._coizyPeers = peers;
 let interactables = [];
 let npcManager;
 let composer, vignettePass, bloomPass;
@@ -69,17 +72,31 @@ const errorMessages = [
 ];
 let loginAttempts = 0;
 
+// HMR Cleanup: Stop previous engine loops and clean up before starting new one
+if (window._coizyStopEngine) {
+  window._coizyStopEngine();
+}
+
 // ========================
 // 1. THREE.JS CORE — Setup langsung (tidak tunggu RAPIER)
 // ========================
 const canvas = document.querySelector('#bg-canvas');
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 5000);
-camera.position.set(0, 10, 40);
+
+// Cleanup existing renderer on hot-reload to avoid context fighting
+if (window._coizyRenderer) {
+  window._coizyRenderer.dispose();
+}
+// Cleanup CSS2D labels to prevent "ghost" nameplates
+if (window._coizyLabelRenderer) {
+  if (window._coizyLabelRenderer.domElement.parentElement) {
+    window._coizyLabelRenderer.domElement.parentElement.removeChild(window._coizyLabelRenderer.domElement);
+  }
+}
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+window._coizyRenderer = renderer;
 renderer.setSize(window.innerWidth, window.innerHeight);
-// Membatasi pixel ratio ke 0.8 untuk performa drastis ("Chunky Flat Pastel" makin terasa)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.8));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -96,16 +113,16 @@ const effect = new OutlineEffect(renderer, {
 // Sky & Fog globals
 let sky, sun;
 function setupSky() {
-  scene.background = new THREE.Color(0xC2E4FB); // Baby Blue
-  scene.fog = new THREE.Fog(0xC2E4FB, 35, 300);
+  scene.background = new THREE.Color(0xF8D4E4); // Rose Mist at horizon
+  scene.fog = new THREE.Fog(0xF8D4E4, 45, 180); // Aerial perspective (Atmospheric Depth)
 
-  // Still use the sky dome for a beautiful gradient, but update colors to match spec
   const skyGeo = new THREE.SphereGeometry(2000, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     uniforms: {
-      topColor:    { value: new THREE.Color(0xC2E4FB) }, // Baby Blue
-      bottomColor: { value: new THREE.Color(0xF8D4E4) } // Rose Mist horizon
+      colorTop: { value: new THREE.Color(0xC2E4FB) }, // Zenith (Baby Blue)
+      colorMid: { value: new THREE.Color(0xE0C8E8) }, // Mid (Lilac/Pinkish mix)
+      colorBot: { value: new THREE.Color(0xF8D4E4) }  // Horizon (Rose Mist)
     },
     vertexShader: `
       varying vec3 vWorldPos;
@@ -115,12 +132,21 @@ function setupSky() {
       }
     `,
     fragmentShader: `
-      uniform vec3 topColor;
-      uniform vec3 bottomColor;
+      uniform vec3 colorTop;
+      uniform vec3 colorMid;
+      uniform vec3 colorBot;
       varying vec3 vWorldPos;
       void main() {
         float h = normalize(vWorldPos).y;
-        gl_FragColor = vec4(mix(bottomColor, topColor, max(0.0, h)), 1.0);
+        h = max(0.0, h);
+        vec3 color;
+        // Transisi warna langit menjadi 3 layer (Pink/Cream -> Mix -> Blue)
+        if (h < 0.3) {
+            color = mix(colorBot, colorMid, h / 0.3);
+        } else {
+            color = mix(colorMid, colorTop, (h - 0.3) / 0.7);
+        }
+        gl_FragColor = vec4(color, 1.0);
       }
     `
   });
@@ -141,13 +167,13 @@ function setupSky() {
 }
 setupSky();
 
-// Lighting — Phase 1 Specifications
-const ambientLight = new THREE.AmbientLight(0xDDD4F8, 0.95); // Lavender ambient
+// Lighting — Single Directional Warm dengan Amber Shadow
+const ambientLight = new THREE.AmbientLight(0x7B5830, 0.4); // Warm Amber baselight, mengontrol kegelapan bayangan
 scene.add(ambientLight);
 
-const sd = 120; // Increased shadow area for larger island
-const sunLight = new THREE.DirectionalLight(0xFFF0A8, 2.5); // Butter daylight
-sunLight.position.set(120, 160, 100);
+const sd = 120;
+const sunLight = new THREE.DirectionalLight(0xFFF6D4, 2.5); // Warm cream daylight
+sunLight.position.set(100, 160, -60); // Arahkan dari atas-kiri-belakang (single direction)
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.setScalar(1024);
 sunLight.shadow.camera.left = -sd;
@@ -157,11 +183,38 @@ sunLight.shadow.camera.bottom = -sd;
 sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 250;
 sunLight.shadow.bias = -0.0008;
-sunLight.shadow.radius = 16;
+// Trik bayangan hangat: campur AmbientLight Amber dengan Shadow berwarna
+sunLight.shadow.radius = 8;
 scene.add(sunLight);
 
-const hemiLight = new THREE.HemisphereLight(0xF8D4E4, 0xFDDBB4, 1.2); // Rose mist sky, Peach ground
+// Hemisphere light untuk gradasi objek: Atas pinkist langit, bawah amber shadow
+const hemiLight = new THREE.HemisphereLight(0xF8D4E4, 0x7B5830, 0.9); 
 scene.add(hemiLight);
+
+// ========================
+// 1.5 WIND PARTICLES (LEAVES & PETALS)
+// ========================
+const particleGroup = new THREE.Group();
+scene.add(particleGroup);
+const pMatGreen = new THREE.MeshBasicMaterial({ color: 0x8AAA40, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+const pMatPink  = new THREE.MeshBasicMaterial({ color: 0xE8A8B8, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+const pGeo = new THREE.CircleGeometry(0.12, 6);
+pGeo.scale(1.0, 0.5, 1.0); // Bikin lonjong kayak daun
+const windParticles = [];
+
+for (let i = 0; i < 20; i++) {
+  const pMat = i < 12 ? pMatGreen : pMatPink;
+  const pMesh = new THREE.Mesh(pGeo, pMat);
+  pMesh.position.set((Math.random() - 0.5) * 60, Math.random() * 10 + 2, (Math.random() - 0.5) * 60);
+  pMesh.userData = {
+    speedX: Math.random() * 2 + 1.0,
+    speedY: (Math.random() - 0.5) * 0.5,
+    rotX: Math.random(), rotY: Math.random(), rotZ: Math.random()
+  };
+  pMesh.name = "ENV_WindParticle";
+  particleGroup.add(pMesh);
+  windParticles.push(pMesh);
+}
 
 // Post Processing — Vignette + Bloom (Bloom strength dinamis via settings)
 composer = new EffectComposer(renderer);
@@ -185,6 +238,7 @@ labelRenderer.domElement.style.position = 'absolute';
 labelRenderer.domElement.style.top = '0px';
 labelRenderer.domElement.style.pointerEvents = 'none';
 document.body.appendChild(labelRenderer.domElement);
+window._coizyLabelRenderer = labelRenderer;
 
 const raycaster = new THREE.Raycaster();
 const screenCenter = new THREE.Vector2(0, 0);
@@ -240,11 +294,16 @@ function setupPointerLock() {
       debugLog('❌ POINTER LOCK', 'Tidak aktif, mouse bebas (menu terbuka?)');
       document.removeEventListener('mousemove', onMouseMove);
       if (inGame) {
-        const memBook = document.getElementById('memory-book');
-        const emoteW = document.getElementById('emote-wheel');
-        if ((!memBook || memBook.classList.contains('hidden')) && 
-            (!emoteW || emoteW.classList.contains('hidden'))) {
-          document.getElementById('pause-menu')?.classList.remove('hidden');
+        const isPauseEnabled = import.meta.env.VITE_ENABLE_PAUSE_MENU === 'true';
+        if (isPauseEnabled) {
+            const memBook = document.getElementById('memory-book');
+            const emoteW = document.getElementById('emote-wheel');
+            const setUI = document.getElementById('settings-panel');
+            if ((!memBook || memBook.classList.contains('hidden')) && 
+                (!emoteW || emoteW.classList.contains('hidden')) &&
+                (!setUI || setUI.classList.contains('hidden'))) {
+              document.getElementById('pause-menu')?.classList.remove('hidden');
+            }
         }
       }
     }
@@ -294,6 +353,9 @@ function unlockPointer() {
 
 function togglePause() {
   if (!inGame) return;
+  const isPauseEnabled = import.meta.env.VITE_ENABLE_PAUSE_MENU === 'true';
+  if (!isPauseEnabled) return; // Jika diset false, jangan tampilkan menu
+
   const pauseMenu = document.getElementById('pause-menu');
   const isHidden = pauseMenu.classList.contains('hidden');
   
@@ -390,7 +452,12 @@ function toggleFreeCam() {
 
 const gameGroup = new THREE.Group();
 scene.add(gameGroup);
-gameGroup.visible = false;
+
+// HMR Cleanup: Pastikan gameGroup yang lama dibuang jika script di-reload
+if (window._oldGameGroup) {
+  scene.remove(window._oldGameGroup);
+}
+window._oldGameGroup = gameGroup;
 
 // ========================
 // 4. ANIMATE LOOP — Berjalan dari awal
@@ -417,8 +484,16 @@ let promptObj = null;
 
 // === PERBAIKAN 1: SISTEM RESPAWN AMAN ===
 function respawnPlayer() {
-  // Spawn just above the island's highest point (~8-11 units)
-  const spawnX = 0, spawnZ = 0, spawnY = 12;
+  // Koordinat khusus sesuai permintaan User (Screenshot)
+  let spawnX = 0, spawnZ = 0, spawnY = 8;
+  
+  if (localPlayerData) {
+    if (localPlayerData.n === 'Elfan') {
+      spawnX = 3.3; spawnY = 5.6; spawnZ = -4.3;
+    } else if (localPlayerData.n === 'Savira') {
+      spawnX = -4.1; spawnY = 5.6; spawnZ = -4.8;
+    }
+  }
   
   if (playerBody) {
     playerBody.setTranslation({ x: spawnX, y: spawnY, z: spawnZ }, true);
@@ -430,17 +505,21 @@ function respawnPlayer() {
   isGrounded = false;
   
   cameraYaw = 0;
-  cameraPitch = -0.1; // slight downward look at spawn
+  cameraPitch = -0.1;
   playerGroup.rotation.y = 0;
-  camera.position.set(0, 0.75, 0); // Local to playerGroup (eye height)
+  camera.position.set(0, 0.75, 0);
   updateCameraRotation();
   
-  debugLog('🌟 RESPAWN', `Player dispawn di ketinggian Y:${spawnY} (jatuh ke pulau...)`);
+  debugLog('🌟 RESPAWN', `Player ${localPlayerData?.n} respawn di [${spawnX}, ${spawnY}, ${spawnZ}]`);
 }
 
 let debugFrameCounter = 0;
 
+let isLoopRunning = true;
+window._coizyStopEngine = () => { isLoopRunning = false; };
+
 function animate() {
+  if (!isLoopRunning) return;
   requestAnimationFrame(animate);
   const time = performance.now();
   const rawDelta = (time - lastT) / 1000;
@@ -487,8 +566,31 @@ function animate() {
   if (inGame && npcManager) npcManager.update();
 
   // Pastikan Sky Dome selalu mengikuti posisi camera agar tidak pernah ter-clip
+  // Pastikan Sky Dome selalu mengikuti posisi camera (Global)
   if (window._skyMesh) {
-    window._skyMesh.position.copy(camera.position);
+    const worldPos = new THREE.Vector3();
+    camera.getWorldPosition(worldPos);
+    window._skyMesh.position.copy(worldPos);
+  }
+
+  // ====== LEAF PARTICLES ANIMATION ======
+  if (windParticles.length > 0) {
+    const pTime = time * 0.001;
+    windParticles.forEach(p => {
+        const u = p.userData;
+        p.position.x -= u.speedX * delta;
+        p.position.y += Math.sin(pTime * 2.0 + p.position.x) * 0.01 + u.speedY * delta;
+        p.rotation.x += u.rotX * delta * 2;
+        p.rotation.y += u.rotY * delta * 2;
+        p.rotation.z += u.rotZ * delta * 2;
+        
+        // Wrap around effect
+        if (p.position.x < -40) {
+            p.position.x = 40;
+            p.position.y = Math.random() * 10 + 2;
+            p.position.z = (Math.random() - 0.5) * 60;
+        }
+    });
   }
 
   lastT = time;
@@ -538,8 +640,11 @@ function proceedToWorld(player) {
   if (isEntering) return;
   isEntering = true;
   
+  // HMR Guard: Jika sedang reload, pastikan animasi lama tidak bentrok
+  gsap.killTweensOf(camera.position); 
+  
   // Zoom camera ke pulau lalu masuk
-  gsap.to(uiLayer, { opacity: 0, duration: 1 });
+  gsap.to(uiLayer, { opacity: 0, duration: 0.8 });
   gsap.to(camera.position, { z: -25, y: 5, duration: 3, ease: 'power2.inOut', onComplete: () => {
     gsap.to('#transition-overlay', { opacity: 1, duration: 1, onComplete: () => {
       lobbyGroup.visible = false; // HILANGKAN PULAU LOBBY
@@ -552,6 +657,7 @@ function proceedToWorld(player) {
 // 6. INIT GAME ENGINE — Async, dipanggil setelah login
 // ========================
 async function initGameEngine(player) {
+  localPlayerData = player;
   // Loading Screen
   const loadingScreen = document.getElementById('loading-screen');
   const loadingLogo = loadingScreen.querySelector('.logo');
@@ -575,9 +681,13 @@ async function initGameEngine(player) {
   Layers = { TERRAIN: 0x0001, STATIC: 0x0002, DYNAMIC: 0x0004, PLAYER: 0x0008, NPC: 0x0010, TRIGGER: 0x0020 };
 
   setLoad(50, 'Menanam pohon-pohon...');
-  // Player Physics — Near island center
+  // Player Physics — Menggunakan kordinat spawn khusus yang diminta
+  let startX = 0, startY = 8, startZ = 0;
+  if (player.n === 'Elfan') { startX = 3.3; startY = 5.6; startZ = -4.3; }
+  else if (player.n === 'Savira') { startX = -4.1; startY = 5.6; startZ = -4.8; }
+
   const playerBodyDesc = RAPIER.RigidBodyDesc.dynamic()
-    .setTranslation(3, 5, 3)
+    .setTranslation(startX, startY, startZ)
     .setLinearDamping(0.01)
     .setAngularDamping(1.0)
     .lockRotations();
@@ -626,10 +736,10 @@ async function initGameEngine(player) {
   // Small limbs
   const limbMat = new THREE.MeshStandardMaterial({ color: player.c });
   const limbGeo = new THREE.CapsuleGeometry(0.08, 0.15, 4, 8);
-  const lArm = new THREE.Mesh(limbGeo, limbMat); lArm.position.set(-0.48, 0.2, 0.0); lArm.rotation.z = 0.4;
-  const rArm = new THREE.Mesh(limbGeo, limbMat); rArm.position.set(0.48, 0.2, 0.0); rArm.rotation.z = -0.4;
-  const lLeg = new THREE.Mesh(limbGeo, limbMat); lLeg.position.set(-0.2, -0.3, 0);
-  const rLeg = new THREE.Mesh(limbGeo, limbMat); rLeg.position.set(0.2, -0.3, 0);
+  const lArm = new THREE.Mesh(limbGeo, limbMat); lArm.position.set(-0.48, 0.2, 0.0); lArm.rotation.z = 0.4; lArm.name = 'lArm';
+  const rArm = new THREE.Mesh(limbGeo, limbMat); rArm.position.set(0.48, 0.2, 0.0); rArm.rotation.z = -0.4; rArm.name = 'rArm';
+  const lLeg = new THREE.Mesh(limbGeo, limbMat); lLeg.position.set(-0.2, -0.3, 0); lLeg.name = 'lLeg';
+  const rLeg = new THREE.Mesh(limbGeo, limbMat); rLeg.position.set(0.2, -0.3, 0); rLeg.name = 'rLeg';
   playerVisGroup.add(lArm, rArm, lLeg, rLeg);
   
   // Simple dark shadow under character (no real shadow drop)
@@ -641,7 +751,8 @@ async function initGameEngine(player) {
   
   playerGroup.add(playerVisGroup);
   playerVisual = playerVisGroup;
-  playerVisual.visible = false; 
+  // Karakter lokal selalu visible (kelihatan dari kamera 3rd person)
+  playerVisual.visible = true;
 
   // Setup NPC Manager
   npcManager = new NPCManager({ getHeight: (x, z) => worldBuilder ? worldBuilder.getHeight(x, z) : 0 }, playerGroup);
@@ -783,6 +894,8 @@ function handleInteraction() {
       break;
 
     case 'flower':
+      const fIdx = interactables.indexOf(currentInteractable);
+      socket?.emit('interaction', { type: 'flower', index: fIdx });
       inventory[data.flowerId]++;
       updateHUD();
       const slot = document.getElementById(`slot-${data.flowerId}`);
@@ -826,6 +939,7 @@ function handleInteraction() {
           ease: 'power2.inOut' 
         });
         showSpeechBubble(isOpen ? 'Pintu ditutup' : 'Pintu dibuka', 1000);
+        socket?.emit('interaction', { type: 'door', state: !isOpen }); // BASTKAN STATUS PINTU KE PEMAIN LAIN
       }
       break;
 
@@ -836,6 +950,8 @@ function handleInteraction() {
       break;
 
     case 'crate':
+      const cIdx = interactables.indexOf(currentInteractable);
+      socket?.emit('interaction', { type: 'crate', index: cIdx });
       gsap.to(currentInteractable.scale, { x: 1.1, y: 1.1, z: 1.1, duration: 0.1, yoyo: true, repeat: 1, ease: 'power2.out' });
       showSpeechBubble("Membuka peti... 📦");
       break;
@@ -846,9 +962,11 @@ function handleInteraction() {
       break;
 
     case 'generator':
+      const gIdx = interactables.indexOf(currentInteractable);
+      socket?.emit('interaction', { type: 'generator', index: gIdx });
       gsap.to(currentInteractable.position, { x: currentInteractable.position.x + 0.05, duration: 0.05, repeat: 10, yoyo: true });
       showSpeechBubble("Brum... brum... ⚙️", 1500);
-      togglePower();
+      if (typeof togglePower === 'function') togglePower();
       break;
 
     case 'stump':
@@ -1230,9 +1348,9 @@ function updatePhysics(delta, time) {
     playerBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
   }
 
-  // Sync player group XZ & Y (Langsung mengikuti titik pusat kapsul fisika)
+  // Sync player group XZ & Y — kurangi 0.5 agar visual karakter nempel ke tanah (bukan melayang)
   if (playerState === 'idle') {
-    playerGroup.position.set(pTrans.x, pTrans.y, pTrans.z);
+    playerGroup.position.set(pTrans.x, pTrans.y - 0.5, pTrans.z);
   } else if (playerState === 'leaning' && sittingObj) {
     // Stick to tree
     const targetPos = sittingObj.getWorldPosition(new THREE.Vector3());
@@ -1403,13 +1521,14 @@ function updatePhysics(delta, time) {
     camera.fov = THREE.MathUtils.lerp(camera.fov, targetFOV, 8.0 * delta);
     camera.updateProjectionMatrix();
 
-    // Third Person: move camera back along local Z axis
-    if (isThirdPerson) {
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, 4.0, 8.0 * delta);
-      if (playerVisual) playerVisual.visible = true;
-    } else {
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, 0.0, 8.0 * delta);
-      if (playerVisual) playerVisual.visible = false;
+    // Orbit Camera: Position relative to player (First Person vs Third Person)
+    const targetZ = isThirdPerson ? 4.5 : 0.0;
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ, 8.0 * delta);
+    
+    // Sembunyikan model hanya jika kamera sangat dekat dengan mata (First Person)
+    // Gunakan threshold 0.1 agar saat baru bergeser sedikit pun langsung hilang kepalanya
+    if (playerVisual) {
+      playerVisual.visible = (isThirdPerson || camera.position.z > 0.1);
     }
   }
 
@@ -1458,18 +1577,83 @@ function updatePhysics(delta, time) {
     if (compassEl) compassEl.textContent = `${dir} ${Math.floor(deg)}°`;
   }
 
-  // Network emit
-  if (socket && time - lastEmitT > 33) {
+  // ======= AKHIR DARI FUNGSI updatePhysics =======
+  // Animasi karakter lokal — setiap frame
+  if (playerVisual && inGame) {
+    playerVisual.rotation.y = Math.PI;
+    const isMoving = !!(moveState.w || moveState.a || moveState.s || moveState.d);
+    animateLimbs(playerVisual, isMoving ? 1.0 : 0.0, time * 0.001);
+  }
+
+  // EMIT posisi — hanya kirim jika ada perubahan bermakna (untuk kurangi jitter)
+  if (socket && socket.connected && inGame && playerBody && time - lastEmitT > 50) {
     const pos = playerGroup.position;
-    if (moveState.w || moveState.a || moveState.s || moveState.d) {
+    const isMoving = !!(moveState.w || moveState.a || moveState.s || moveState.d);
+    const normalizedRy = ((cameraYaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+
+    // Cek perbedaan posisi/rotasi dari emit terakhir
+    const lastP = socket._lastP || { x:0, y:0, z:0 };
+    const lastR = socket._lastR || 0;
+    const distSq = (pos.x - lastP.x)**2 + (pos.y - lastP.y)**2 + (pos.z - lastP.z)**2;
+    const rotDiff = Math.abs(normalizedRy - lastR);
+    const forceEmit = (time - lastEmitT) > 333; // Heartbeat setiap 333ms meski diam
+
+    if (distSq > 0.0001 || rotDiff > 0.02 || isMoving || forceEmit) {
       lastEmitT = time;
-      socket.emit('player_move', { x: pos.x, y: pos.y, z: pos.z, ry: cameraYaw });
+      socket._lastP = { x: pos.x, y: pos.y, z: pos.z };
+      socket._lastR = normalizedRy;
+      socket.emit('player_move', { x: pos.x, y: pos.y, z: pos.z, ry: normalizedRy, moving: isMoving });
     }
   }
 
-  // Sync peers
+  // SYNC PEERS — lerp sederhana, rotasi dari delta posisi
   Object.values(peers).forEach(peer => {
-    if (peer.targetPos) peer.position.lerp(peer.targetPos, 0.1);
+    if (!peer.targetPos) return;
+
+    // Simpan posisi sebelumnya untuk hitung arah gerak
+    const prevX = peer.position.x;
+    const prevZ = peer.position.z;
+
+    // Sinkronisasi posisi dengan Lerp + Snap untuk hilangkan micro-jitter
+    const d = peer.position.distanceTo(peer.targetPos);
+    if (d > 0.001) {
+      // Lerp XYZ dengan faktor tetap agar smooth
+      peer.position.lerp(peer.targetPos, 0.12);
+      // Jika sudah sangat dekat (<1cm), langsung snap agar lerp tidak sisa jitter
+      if (d < 0.01) peer.position.copy(peer.targetPos);
+    }
+
+    const body = peer.getObjectByName("Body");
+    if (!body) return;
+
+    // Logika Rotasi STABIL (Anti-Flicker & Smooth Transition)
+    const moveDx = peer.targetPos.x - peer.position.x;
+    const moveDz = peer.targetPos.z - peer.position.z;
+    const moveDistToTargetSq = moveDx*moveDx + moveDz*moveDz;
+    
+    // Gunakan state sebelumnya untuk cegah perubahaan drastis (Hysteresis)
+    const isMovingLocally = peer.isMoving || moveDistToTargetSq > 0.002;
+    let targetAngle = body.rotation.y;
+
+    if (isMovingLocally) {
+      // HADAP JALAN
+      targetAngle = Math.atan2(moveDx, moveDz) + Math.PI;
+    } else if (peer.targetRot !== undefined) {
+      // HADAP KAMERA
+      targetAngle = peer.targetRot + Math.PI;
+    }
+
+    // Shortest path logic
+    let diff = targetAngle - body.rotation.y;
+    diff = ((diff + Math.PI) % (Math.PI * 2)) - Math.PI;
+
+    // Smoothing: Sangat halus saat diam, sedikit lebih cepat saat berganti arah jalan
+    const smoothFactor = isMovingLocally ? 0.2 : 0.06;
+    if (Math.abs(diff) > 0.01) {
+      body.rotation.y += diff * smoothFactor;
+    }
+
+    animateLimbs(body, peer.isMoving ? 1.0 : 0.0, time * 0.001);
   });
 
   // Sync player speed to NPC Manager (Perbaikan 6 & 7)
@@ -1478,6 +1662,30 @@ function updatePhysics(delta, time) {
     const speed = Math.sqrt(vel.x**2 + vel.z**2);
     // Kita simpan di userData mesh agar NPCManager bisa baca
     playerGroup.children[0].userData.playerSpeed = speed; // children[0] biasanya mata/mesh visual
+  }
+}
+
+// ========================
+// Helper: Procedural Walk Animation (TANPA modifikasi position.y agar tidak konflik dengan network Y)
+// ========================
+function animateLimbs(visGroup, speed, t) {
+  const lArm = visGroup.getObjectByName('lArm');
+  const rArm = visGroup.getObjectByName('rArm');
+  const lLeg = visGroup.getObjectByName('lLeg');
+  const rLeg = visGroup.getObjectByName('rLeg');
+  if (speed > 0.01) {
+    const walkSpd = 8.0;
+    const s = Math.sin(t * walkSpd) * 0.5;
+    if (lArm) lArm.rotation.x = s;
+    if (rArm) rArm.rotation.x = -s;
+    if (lLeg) lLeg.rotation.x = -s;
+    if (rLeg) rLeg.rotation.x = s;
+  } else {
+    // Kembali idle dengan halus
+    if (lArm) lArm.rotation.x = THREE.MathUtils.lerp(lArm.rotation.x, 0, 0.1);
+    if (rArm) rArm.rotation.x = THREE.MathUtils.lerp(rArm.rotation.x, 0, 0.1);
+    if (lLeg) lLeg.rotation.x = THREE.MathUtils.lerp(lLeg.rotation.x, 0, 0.1);
+    if (rLeg) rLeg.rotation.x = THREE.MathUtils.lerp(rLeg.rotation.x, 0, 0.1);
   }
 }
 
@@ -1574,54 +1782,183 @@ function checkInteraction() {
 // ========================
 function initNetwork(playerName, playerColor) {
   try {
-    socket = io('http://localhost:3001');
+    // Putus koneksi lama jika ada (HMR/hot-reload)
+    if (window._coizySocket) {
+      window._coizySocket.disconnect();
+    }
+    if (window._coizyPeers) {
+      Object.values(window._coizyPeers).forEach(g => gameGroup && gameGroup.remove(g));
+    }
+    Object.keys(peers).forEach(id => removePeer(id));
+
+    // Buat koneksi baru dan biarkan auto-reconnect aktif untuk menangani Vite HMR/network drops
+    socket = io('http://localhost:3001', {
+      reconnection: true
+    });
+    window._coizySocket = socket;
+    window._coizyPeers = peers;
+
+    // ── Event handlers didaftarkan SEKALI di luar connect ──
+
     socket.on('connect', () => {
+      console.log('[NET] Connected:', socket.id);
+      // Join room setelah koneksi berhasil
       socket.emit('join_room', { roomCode: 'COIZY', name: playerName, color: playerColor }, (res) => {
-        if (res && res.success) res.others.forEach(p => addPeer(p));
-      });
-      socket.on('player_joined', ({ player }) => addPeer(player));
-      socket.on('player_moved', (data) => {
-        if (peers[data.id]) {
-          peers[data.id].targetPos = new THREE.Vector3(data.x, data.y, data.z);
-          peers[data.id].targetRot = data.ry;
-        }
-      });
-      socket.on('player_left', ({ id }) => removePeer(id));
-      socket.on('interaction', (data) => {
-        if (data.type === 'emote') {
-          const peer = peers[data.id];
-          if (peer) showEmoteUI(peer, data.message, false);
-        } else if (data.type === 'vinyl') {
-          showNotificationToast(data.state ? "Seseorang memutar musik... 🎶" : "Musik dimatikan.");
-        } else if (data.type === 'notepad') {
-           const area = document.getElementById('notepad-area');
-           if (area) area.value = data.text;
-        }
+        if (!res || !res.success) { console.warn('[NET] Join failed:', res?.error); return; }
+        // Tambahkan semua pemain yang sudah ada di room
+        res.others.forEach(p => addPeer(p));
       });
     });
+
+    socket.on('disconnect', (reason) => {
+      console.log('[NET] Disconnected:', reason);
+      // Jangan hapus peers saat disconnect — cegah flicker
+    });
+
+    socket.on('player_joined', ({ player }) => {
+      if (!peers[player.id]) addPeer(player);
+    });
+
+    socket.on('player_moved', (data) => {
+      const peer = peers[data.id];
+      if (!peer) return;
+
+      const newPos = new THREE.Vector3(data.x, data.y, data.z);
+      if (!peer.hasFirstPos) {
+        // Snap langsung ke posisi pertama kali — tidak ada lerp
+        peer.position.copy(newPos);
+        peer.hasFirstPos = true;
+      }
+      peer.targetPos = newPos;
+      peer.targetRot = data.ry; // Update arah pandang kamera peer
+      peer.isMoving = data.moving || false;
+    });
+
+    socket.on('player_left', ({ id }) => removePeer(id));
+
+    socket.on('interaction', (data) => {
+      const peer = peers[data.id];
+      if (data.type === 'emote') {
+        if (peer) showEmoteUI(peer, data.message, false);
+      } else if (data.type === 'vinyl') {
+        showNotificationToast(data.state ? "Seseorang memutar musik... 🎶" : "Musik dimatikan.");
+      } else if (data.type === 'notepad') {
+        const area = document.getElementById('notepad-area');
+        if (area) area.value = data.text;
+      } else if (data.type === 'door') {
+        const d = scene.getObjectByName('DOOR_MAIN');
+        if (d && d.parent) {
+          d.parent.userData.isOpen = data.state;
+          gsap.to(d.parent.rotation, { y: data.state ? -Math.PI / 2 : 0, duration: 0.6, ease: 'power2.inOut' });
+        }
+      } else if (data.type === 'flower') {
+        const fObject = interactables[data.index];
+        if (fObject) {
+          fObject.visible = false;
+          setTimeout(() => {
+            fObject.visible = true;
+            fObject.scale.set(0, 0, 0);
+            gsap.to(fObject.scale, { x: 1, y: 1, z: 1, duration: 1.5, ease: 'bounce.out' });
+          }, 60000);
+        }
+      } else if (data.type === 'crate') {
+        const cObj = interactables[data.index];
+        if (cObj) gsap.to(cObj.scale, { x: 1.1, y: 1.1, z: 1.1, duration: 0.1, yoyo: true, repeat: 1 });
+      } else if (data.type === 'generator') {
+        const gObj = interactables[data.index];
+        if (gObj) gsap.to(gObj.position, { x: gObj.position.x + 0.05, duration: 0.05, repeat: 10, yoyo: true });
+      }
+    });
+
   } catch (e) {
     console.error("Network Init Error:", e);
   }
 }
 
 function addPeer(p) {
+  if (peers[p.id]) removePeer(p.id); 
+  
+  // AGRESSIVE CLEANUP: Cek registry global agar tidak ada duplikat meski reload
+  if (window._coizyPeers) {
+    Object.keys(window._coizyPeers).forEach(id => {
+      const oldPeer = window._coizyPeers[id];
+      if (oldPeer && oldPeer.userData && oldPeer.userData.name === p.name) {
+        if (gameGroup) gameGroup.remove(oldPeer);
+        delete window._coizyPeers[id];
+      }
+    });
+  }
+  
   const group = new THREE.Group();
-  // Visual peer juga diperbesar agar serasi
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 1.7, 4, 8), new THREE.MeshStandardMaterial({ color: p.color }));
-  body.position.y = 1.35;
-  group.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), new THREE.MeshStandardMaterial({ color: '#ffe0bd' }));
-  head.position.y = 2.8;
-  group.add(head);
+  group.userData = { id: p.id, name: p.name };
+  const playerVisGroup = new THREE.Group();
+
+  // Tubuh Chubby
+  const bodyMesh = new THREE.Mesh(new THREE.SphereGeometry(0.48, 16, 16), new THREE.MeshStandardMaterial({ color: p.color, roughness: 1.0 }));
+  bodyMesh.position.y = 0.1;
+  playerVisGroup.add(bodyMesh);
+
+  // Kepala
+  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), new THREE.MeshStandardMaterial({ color: p.color, roughness: 1.0 }));
+  headMesh.position.y = 0.65;
+  playerVisGroup.add(headMesh);
+
+  // Mata
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x4a4a4a });
+  const eyeGeo = new THREE.SphereGeometry(0.065, 8, 8);
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat); leftEye.position.set(-0.16, 0.72, 0.37);
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat); rightEye.position.set(0.16, 0.72, 0.37);
+
+  // Highlight Mata
+  const hlMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+  const hlGeo = new THREE.SphereGeometry(0.025, 6, 6);
+  const lHl = new THREE.Mesh(hlGeo, hlMat); lHl.position.set(-0.02, 0.025, 0.05); leftEye.add(lHl);
+  const rHl = new THREE.Mesh(hlGeo, hlMat); rHl.position.set(-0.02, 0.025, 0.05); rightEye.add(rHl);
+  playerVisGroup.add(leftEye, rightEye);
+
+  // Pipi Blush
+  const blushMat = new THREE.MeshBasicMaterial({ color: 0xFF9E6C, transparent: true, opacity: 0.45 });
+  const blushGeo = new THREE.CircleGeometry(0.07, 12);
+  const lBlush = new THREE.Mesh(blushGeo, blushMat); lBlush.position.set(-0.28, 0.62, 0.33); lBlush.rotation.y = -0.4;
+  const rBlush = new THREE.Mesh(blushGeo, blushMat); rBlush.position.set(0.28, 0.62, 0.33); rBlush.rotation.y = 0.4;
+  playerVisGroup.add(lBlush, rBlush);
+
+  // Kaki dan Tangan
+  const limbMat = new THREE.MeshStandardMaterial({ color: p.color });
+  const limbGeo = new THREE.CapsuleGeometry(0.08, 0.15, 4, 8);
+  const lArm = new THREE.Mesh(limbGeo, limbMat); lArm.position.set(-0.48, 0.2, 0.0); lArm.rotation.z = 0.4; lArm.name = 'lArm';
+  const rArm = new THREE.Mesh(limbGeo, limbMat); rArm.position.set(0.48, 0.2, 0.0); rArm.rotation.z = -0.4; rArm.name = 'rArm';
+  const lLeg = new THREE.Mesh(limbGeo, limbMat); lLeg.position.set(-0.2, -0.3, 0); lLeg.name = 'lLeg';
+  const rLeg = new THREE.Mesh(limbGeo, limbMat); rLeg.position.set(0.2, -0.3, 0); rLeg.name = 'rLeg';
+  playerVisGroup.add(lArm, rArm, lLeg, rLeg);
+
+  // Shadow sederhana
+  const shadowMat = new THREE.MeshBasicMaterial({ color: 0x7B5830, transparent: true, opacity: 0.25, depthWrite: false });
+  const blobShadow = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), shadowMat);
+  blobShadow.rotation.x = -Math.PI / 2;
+  blobShadow.position.y = -0.45;
+  playerVisGroup.add(blobShadow);
+
+  group.add(playerVisGroup);
+
+  // Nameplate
   const cnv = document.createElement('canvas');
   const ctx = cnv.getContext('2d'); cnv.width = 256; cnv.height = 64;
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath(); ctx.roundRect(0,0,256,64,20); ctx.fill();
   ctx.font = 'bold 36px Arial'; ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.fillText(p.name, 128, 45);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cnv) }));
-  sprite.position.y = 3.8; sprite.scale.set(3, 0.75, 1);
+  
+  // Posisi nama diturunkan karena model karakter baru lebih pendek dan bulat
+  sprite.position.set(0, 1.4, 0); 
+  sprite.scale.set(1.5, 0.375, 1);
   group.add(sprite);
+
   group.position.set(p.x || 0, p.y || 1, p.z || 0);
   group.targetPos = group.position.clone();
+  
+  // Referensi rotasi untuk sync
+  playerVisGroup.name = "Body";
+
   gameGroup.add(group);
   peers[p.id] = group;
 }

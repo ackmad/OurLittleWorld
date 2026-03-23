@@ -278,20 +278,9 @@ export class WorldBuilder {
             void main() {
                 vUv = uv;
                 vec3 pos = position;
-                
-                // Deteksi jarak dari pusat pulau
-                float distFromCenter = length(pos.xy);
-                
-                // Masker Pasang Surut: 0 di dalam pulau, 1 di laut lepas (setelah radius 60)
-                float tideMask = smoothstep(55.0, 78.0, distFromCenter);
-                
-                // Animasi pasang surut (hanya untuk laut luar)
-                float tide = sin(time * 0.9) * 0.28;
-                pos.z += tide * tideMask;
-                
-                // Gelombang mikro/riak halus (tetap ada di mana-mana agar air hidup)
-                float wave = sin(pos.x * 0.03 + time * 1.2) * 0.32;
-                wave += cos(pos.y * 0.03 + time * 0.9) * 0.25;
+                // Gelombang base lambat
+                float wave = sin(pos.x * 0.04 + time * 1.5) * 0.2;
+                wave += cos(pos.y * 0.03 + time * 0.8) * 0.15;
                 pos.z += wave;
                 
                 vPos = pos;
@@ -304,45 +293,50 @@ export class WorldBuilder {
             varying vec3 vPos;
             uniform float time;
 
-            // Simple 2D Noise function untuk riak air
-            float random(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-            float noise(vec2 p) {
-                vec2 i = floor(p); vec2 f = fract(p);
-                float a = random(i); float b = random(i + vec2(1.0, 0.0));
-                float c = random(i + vec2(0.0, 1.0)); float d = random(i + vec2(1.0, 1.0));
-                vec2 u = f * f * (3.0 - 2.0 * f);
-                return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-            }
-
             void main() {
-                // Palet warna laut tropis -> Coizy Pastel
-                vec3 deepOcean = vec3(0.376, 0.722, 0.910);   // Sky: #60B8E8
-                vec3 shallowOcean = vec3(0.761, 0.894, 0.984); // Baby Blue: #C2E4FB
-                vec3 highlight = vec3(1.0, 1.0, 1.0); // White highlight
+                // Ocean Depth & Color Layering
+                vec3 deepWater = vec3(0.28, 0.66, 0.77);   // #48A8C4 (Teal)
+                vec3 shoreWater = vec3(0.66, 0.85, 0.91);  // #A8D8E8 (Cyan)
+                vec3 foamColor = vec3(0.85, 0.93, 0.97);   // #DAEEF8 (Milky White)
 
-                // Tekstur koordinat
-                vec2 uvScale = vPos.xy * 0.18;
-
-                // 3 Lapisan Noise saling overlap untuk ilusi caustics / ombak
-                float n1 = noise(uvScale + vec2(time * 0.6, time * 0.4));
-                float n2 = noise(uvScale * 1.8 - vec2(time * 0.5, -time * 0.3));
-                float n3 = noise(uvScale * 0.9 + vec2(-time * 0.3, time * 0.6));
-
-                float ripple = (n1 + n2 + n3) / 3.0;
-                ripple = smoothstep(0.45, 0.65, ripple); // Tingkatkan kontras batas riak
-
-                // Campuran base
-                vec3 finalColor = mix(deepOcean, shallowOcean, ripple);
-                
-                // Tambahan highlight buih ombak tipis
-                float foam = smoothstep(0.85, 1.0, ripple);
-                finalColor = mix(finalColor, highlight, foam);
-
-                // Fade out horizon alpha agar tidak pecah
                 float dist = length(vPos.xy);
+                
+                // Color ramp base ocean
+                float depthStr = smoothstep(53.0, 90.0, dist);
+                vec3 baseColor = mix(shoreWater, deepWater, depthStr);
+
+                // 3 Speed Parallax Sinusoidal Waves (Organik & Diagonal)
+                float diagX = vPos.x * 0.8 + vPos.y * 0.6;
+                float diagY = vPos.x * -0.6 + vPos.y * 0.8;
+
+                // Distorsi organik (Wobble) agar tidak membentuk garis lurus yang kaku
+                float wobble = sin(diagY * 0.2 + time * 0.8) * 2.0 + cos(diagX * 0.15 - time * 0.5) * 1.5;
+
+                // 3 layer ombak yang bergerak menyapu dengan kecepatan dan ukuran beda
+                float w1 = sin((diagX + wobble) * 0.25 - time * 1.2) * 0.5 + 0.5;
+                float w2 = sin((diagX + wobble * 0.8 + diagY * 0.1) * 0.35 - time * 1.6) * 0.5 + 0.5;
+                float w3 = sin((diagX + wobble * 1.2 - diagY * 0.15) * 0.45 - time * 2.0) * 0.5 + 0.5;
+                
+                // Menjadikan kurva tsb berbentuk garis tipis di puncaknya
+                float line1 = smoothstep(0.90, 0.96, w1) * 0.45; // Garis tertebal, transparan
+                float line2 = smoothstep(0.94, 0.98, w2) * 0.65; // Garis medium
+                float line3 = smoothstep(0.96, 0.99, w3) * 0.90; // Garis tipis, solid
+                
+                float waveLines = max(line1, max(line2, line3));
+
+                // Busa pantai bergelombang
+                float foamSine = sin(dist * 2.0 - time * 1.2) * 0.5 + 0.5;
+                float isBeach = 1.0 - smoothstep(52.0, 58.0, dist);
+                float beachFoam = smoothstep(0.6, 0.9, foamSine) * isBeach;
+
+                // Mix final foam / ombak
+                float edgeBlend = max(waveLines * 0.6, beachFoam);
+                vec3 finalColor = mix(baseColor, foamColor, edgeBlend);
+
+                // Fade To Background
                 float alpha = 1.0 - smoothstep(300.0, 800.0, dist);
 
-                gl_FragColor = vec4(finalColor, alpha * 0.85); // 85% solid
+                gl_FragColor = vec4(finalColor, alpha * 0.85);
             }
         `;
 
@@ -394,31 +388,107 @@ export class WorldBuilder {
     }
 
     buildOakTrees() {
-        const locations = [[-15,10],[-22,-5],[20,12],[24,-10],[-10,20],[10,-20],[-25,8]];
-        locations.forEach(([x,z], i) => {
-            const h = 4 + Math.random()*2;
+        const locations = [[-15,10],[-22,-5],[20,12],[24,-10],[-10,20],[10,-20],[-25,8], [-12, -22], [8, 25], [26, 4]];
+        
+        const cTrunk = new THREE.Color("#8B5030"); // Muted brown
+        const cDeep = new THREE.Color("#385020");  // Deep shade
+        const cShadow = new THREE.Color("#4A6030"); // Shadow side
+        const cBody = new THREE.Color("#607840");  // Main body
+        const cHigh = new THREE.Color("#9AAA60");  // Highlight top
+        
+        const matTrunk = new THREE.MeshStandardMaterial({ color: cTrunk, roughness: 1.0 });
+        const matDeep = new THREE.MeshStandardMaterial({ color: cDeep, roughness: 1.0, flatShading: true });
+        const matShadow = new THREE.MeshStandardMaterial({ color: cShadow, roughness: 0.9, flatShading: true });
+        const matBody = new THREE.MeshStandardMaterial({ color: cBody, roughness: 0.9, flatShading: true });
+        const matHigh = new THREE.MeshStandardMaterial({ color: cHigh, roughness: 0.8, flatShading: true });
+        
+        // Ambient Occlusion drop shadow
+        const aoMat = new THREE.MeshBasicMaterial({ color: 0x4A3010, transparent: true, opacity: 0.3, depthWrite: false });
+
+        locations.forEach(([x,z]) => {
+            const h = 3.5 + Math.random();
             const by = this.getHeight(x, z);
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, h, 8), new THREE.MeshStandardMaterial({ color: 0x603814 }));
-            trunk.position.set(x, by + h/2, z); this.gameGroup.add(trunk);
             
-            const leafMat = new THREE.MeshStandardMaterial({ color: 0x38a838, roughness: 0.9, flatShading: true });
-            for(let j=0; j<5; j++){
-                const c = new THREE.Mesh(new THREE.SphereGeometry(2.0 + Math.random(), 8, 6), leafMat);
-                c.position.set(x + (Math.random()-0.5)*2, by + h + Math.random()*1.5, z + (Math.random()-0.5)*2);
-                this.gameGroup.add(c);
-            }
+            // Batang utama
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, h, 6), matTrunk);
+            trunk.position.set(x, by + h/2, z); 
+            trunk.castShadow = true;
+            this.gameGroup.add(trunk);
+            
+            // Layer 1: AO Base Shadow ditaruh di tanah
+            const ao = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 4.5), aoMat);
+            ao.rotation.x = -Math.PI / 2;
+            ao.position.set(x, by + 0.05, z);
+            this.gameGroup.add(ao);
+            
+            // Layer 2: Deep shade underneath
+            const sDeep = new THREE.Mesh(new THREE.SphereGeometry(2.1, 7, 6), matDeep);
+            sDeep.position.set(x, by + h + 0.2, z); sDeep.scale.set(1.1, 0.4, 1.1); sDeep.castShadow = true;
+            this.gameGroup.add(sDeep);
+            
+            // Layer 3: Main shadow layer
+            const sShadow = new THREE.Mesh(new THREE.SphereGeometry(2.4, 8, 7), matShadow);
+            sShadow.position.set(x, by + h + 1.2, z); sShadow.scale.set(1.0, 0.7, 1.0); sShadow.castShadow = true;
+            this.gameGroup.add(sShadow);
+            
+            // Layer 4: Main body
+            const sBody = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 7), matBody);
+            sBody.position.set(x + (Math.random()-0.5)*0.5, by + h + 2.5, z + (Math.random()-0.5)*0.5);
+            sBody.scale.set(1.0, 0.8, 1.0); sBody.castShadow = true;
+            this.gameGroup.add(sBody);
+            
+            // Layer 5: Highlight top
+            const sHigh = new THREE.Mesh(new THREE.SphereGeometry(1.6, 7, 6), matHigh);
+            sHigh.position.set(x + (Math.random()-0.5)*0.3, by + h + 3.8, z + (Math.random()-0.5)*0.3);
+            sHigh.scale.set(0.9, 0.6, 0.9); sHigh.castShadow = true;
+            this.gameGroup.add(sHigh);
         });
     }
 
     buildBirchTrees() {
-        const birchTrunkMat = new THREE.MeshStandardMaterial({ color: 0xefeae0 });
-        const birchLeafMat  = new THREE.MeshStandardMaterial({ color: 0x4cc14c });
-        [[-8, 22], [8, -22], [-28, -15]].forEach(([x, z], i) => {
-            const h = 5.5; const by = this.getHeight(x, z);
-            const t = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, h, 8), birchTrunkMat);
-            t.position.set(x, by + h/2, z); this.gameGroup.add(t);
-            const c = new THREE.Mesh(new THREE.SphereGeometry(1.8, 8, 6), birchLeafMat);
-            c.position.set(x, by + h + 1, z); this.gameGroup.add(c);
+        // Birch trees tapi pakai sistem layering warnanya
+        const cDeep = new THREE.Color("#4A6030");
+        const cShadow = new THREE.Color("#607840"); 
+        const cBody = new THREE.Color("#9AAA60");
+        const cHigh = new THREE.Color("#C8D880"); // Lighter birch leaves
+        
+        const matDeep = new THREE.MeshStandardMaterial({ color: cDeep, roughness: 1.0, flatShading: true });
+        const matShadow = new THREE.MeshStandardMaterial({ color: cShadow, roughness: 0.9, flatShading: true });
+        const matBody = new THREE.MeshStandardMaterial({ color: cBody, roughness: 0.9, flatShading: true });
+        const matHigh = new THREE.MeshStandardMaterial({ color: cHigh, roughness: 0.8, flatShading: true });
+        
+        const birchTrunkMat = new THREE.MeshStandardMaterial({ color: 0xe0d6c8, roughness: 1.0 }); // Soft birch bark
+        const aoMat = new THREE.MeshBasicMaterial({ color: 0x4A3010, transparent: true, opacity: 0.25, depthWrite: false });
+
+        [[-8, 22], [8, -22], [-28, -15]].forEach(([x, z]) => {
+            const h = 5.0 + Math.random(); const by = this.getHeight(x, z);
+            
+            // Trunk
+            const t = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, h, 6), birchTrunkMat);
+            t.position.set(x, by + h/2, z); t.castShadow = true; this.gameGroup.add(t);
+            
+            // AO Base Shadow
+            const ao = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 2.8), aoMat);
+            ao.rotation.x = -Math.PI / 2; ao.position.set(x, by + 0.05, z); this.gameGroup.add(ao);
+
+            // Layering
+            const sDeep = new THREE.Mesh(new THREE.SphereGeometry(1.6, 7, 5), matDeep);
+            sDeep.position.set(x, by + h, z); sDeep.scale.set(1.1, 0.5, 1.1); sDeep.castShadow = true;
+            this.gameGroup.add(sDeep);
+            
+            const sShadow = new THREE.Mesh(new THREE.SphereGeometry(1.8, 8, 6), matShadow);
+            sShadow.position.set(x, by + h + 0.8, z); sShadow.scale.set(1.0, 0.8, 1.0); sShadow.castShadow = true;
+            this.gameGroup.add(sShadow);
+            
+            const sBody = new THREE.Mesh(new THREE.SphereGeometry(1.5, 7, 6), matBody);
+            sBody.position.set(x + (Math.random()-0.5)*0.3, by + h + 1.8, z + (Math.random()-0.5)*0.3);
+            sBody.scale.set(1.0, 0.9, 1.0); sBody.castShadow = true;
+            this.gameGroup.add(sBody);
+            
+            const sHigh = new THREE.Mesh(new THREE.SphereGeometry(0.9, 6, 5), matHigh);
+            sHigh.position.set(x + (Math.random()-0.5)*0.2, by + h + 2.8, z + (Math.random()-0.5)*0.2);
+            sHigh.scale.set(0.9, 0.6, 0.9); sHigh.castShadow = true;
+            this.gameGroup.add(sHigh);
         });
     }
 
