@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coizy - Our Little World</title>
+  <title>OurLittleWorld</title>
   <link rel="icon" type="image/svg+xml" href="/images/favicon.svg">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,11 +18,11 @@
   <!-- LOBBY LAYER -->
   <div id="ui-layer">
     <div class="lobby-content">
-      <h1 class="logo">Coizy</h1>
+      <h1 class="logo">OurLittleWorld</h1>
       
       <div class="terminal-box" id="login-box">
-        <p class="instruction">System Initialization...</p>
-        <p class="instruction" style="margin-bottom: 20px; color: var(--accent);">Waiting for reality coordinates.</p>
+        <p class="instruction">Memulai sistem dunia...</p>
+        <p class="instruction" style="margin-bottom: 20px; color: var(--accent);">Menunggu koordinat duniamu.</p>
         
         <div class="input-line">
           <span class="prompt">&gt;</span>
@@ -53,12 +53,12 @@
     <div class="player-info">
       <div class="avatar-badge" id="hud-player-color"></div>
       <div class="player-meta">
-        <span id="hud-player-name">Player</span>
+        <span id="hud-player-name">Pemain</span>
         <div id="camera-coords">
           P: <span id="pos-x">0.0</span>, <span id="pos-y">0.0</span>, <span id="pos-z">0.0</span>
         </div>
       </div>
-      <span class="room-code">Room: COIZY</span>
+      <span class="room-code">Ruang: COIZY</span>
     </div>
 
     <!-- Quick Emotes Guide -->
@@ -140,9 +140,6 @@
         <div class="pause-btns-group">
           <button class="pause-btn" id="btn-resume"><span>Lanjutkan</span></button>
           <button class="pause-btn" id="btn-settings"><span>Pengaturan ⚙️</span></button>
-          <button class="pause-btn" id="btn-membook"><span>Buku Kenangan 📖</span></button>
-          <button class="pause-btn" id="btn-wishbook"><span>Buku Harapan 🌟</span></button>
-          <button class="pause-btn" id="btn-sharednote"><span>Catatan Bersama 📝</span></button>
           <button class="pause-btn" id="btn-quit"><span>Keluar ke Lobby 🚪</span></button>
         </div>
       </div>
@@ -213,7 +210,9 @@
   <!-- LOADING SCREEN -->
   <div id="loading-screen" class="hidden">
     <div class="loading-content">
-      <h1 class="logo rotating">Coizy</h1>
+      <img src="/images/favicon.svg" alt="OurLittleWorld icon" class="loading-icon" />
+      <h1 class="logo loading-logo">OurLittleWorld</h1>
+      <p class="loading-subtitle">Sedang merapikan dunia kecil kalian...</p>
       <div class="progress-bar-container">
         <div class="progress-bar-fill" id="loading-fill"></div>
       </div>

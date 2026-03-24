@@ -495,19 +495,18 @@ body.pointer-locked {
 /* 7.7 LOADING SCREEN */
 #loading-screen {
   position: absolute; top:0; left:0; width:100%; height:100%;
-  background: linear-gradient(160deg, #110b1e 0%, #1a0e2a 40%, #0d1525 100%);
+  background: linear-gradient(160deg, #ffe9f3 0%, #f9eaff 45%, #e6f6ff 100%);
   z-index: 9999;
   display: flex; flex-direction: column; justify-content: center; align-items: center;
   gap: 10px;
 }
 
-/* Ambient glow orbs inside loading screen */
 #loading-screen::before {
   content: '';
   position: absolute;
-  width: 350px; height: 350px;
+  width: 420px; height: 420px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(242, 168, 122, 0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255, 170, 200, 0.25) 0%, transparent 70%);
   left: 50%; top: 50%;
   transform: translate(-50%, -50%);
   animation: breathe 3s ease-in-out infinite;
@@ -518,31 +517,58 @@ body.pointer-locked {
   50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
 }
 
-.rotating {
-  animation: rotate 6s linear infinite;
-  display: block;
-  filter: drop-shadow(0 0 30px rgba(242, 168, 122, 0.6));
+.loading-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.55);
+  border: 3px solid rgba(255, 192, 216, 0.7);
+  border-radius: 28px;
+  padding: 28px 32px 24px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 12px 32px rgba(180, 120, 180, 0.18);
 }
-@keyframes rotate { 100% { transform: rotate(360deg); } }
+
+.loading-icon {
+  width: 70px;
+  height: 70px;
+  margin-bottom: 8px;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 6px 14px rgba(255, 145, 196, 0.35));
+}
+
+.loading-logo {
+  font-size: 2.4rem;
+  margin-bottom: 2px;
+  animation: none;
+  text-shadow: 0 3px 0 rgba(255, 170, 198, 0.5);
+}
+
+.loading-subtitle {
+  color: #8d5d72;
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
 
 .progress-bar-container {
-  width: 280px; height: 5px;
-  background: rgba(255,255,255,0.08);
+  width: 280px; height: 10px;
+  background: rgba(255,255,255,0.65);
   border-radius: 99px; margin: 24px 0 8px; overflow: hidden;
-  box-shadow: 0 0 10px rgba(242, 168, 122, 0.15);
+  border: 2px solid rgba(255, 183, 206, 0.7);
+  box-shadow: inset 0 2px 4px rgba(170, 130, 190, 0.12);
 }
 .progress-bar-fill {
   width: 0%; height: 100%;
-  background: linear-gradient(90deg, #dca776, #f2a87a, #e88a8a);
+  background: linear-gradient(90deg, #ffb3cb, #ffc5a5, #bde7ff);
   border-radius: 99px;
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 12px rgba(242, 168, 122, 0.5);
+  box-shadow: 0 0 12px rgba(255, 167, 200, 0.5);
 }
 .loading-text {
   font-family: 'Baloo 2', sans-serif;
-  color: rgba(242, 232, 216, 0.7);
+  color: #7b5b83;
   font-size: 1rem;
-  font-weight: 400;
+  font-weight: 600;
   letter-spacing: 1px;
   animation: pulseOpacity 2s infinite;
   text-align: center;

@@ -486,6 +486,7 @@ let lastEmitT = 0, lastRayT = 0;
 let currentVel = new THREE.Vector3();
 let verticalVelocity = 0;
 let isGrounded = false;
+let isRespawnTransitioning = false;
 let coyoteTimer = 0;
 let jumpBufferTimer = 0;
 let isSprint = false, isCrouch = false, isThirdPerson = false;
@@ -525,7 +526,28 @@ function respawnPlayer() {
   cameraYaw = 0;
   cameraPitch = -0.1;
   playerGroup.rotation.y = 0;
-  camera.position.set(0, 0.75, 0);
+  gsap.killTweensOf(camera.position);
+  gsap.killTweensOf(camera);
+  isRespawnTransitioning = true;
+  camera.position.set(0, 1.9, 3.2);
+  camera.fov = 82;
+  camera.updateProjectionMatrix();
+  gsap.to(camera.position, {
+    x: 0,
+    y: 0.75,
+    z: 0,
+    duration: 1.05,
+    ease: 'power3.out',
+    onComplete: () => {
+      isRespawnTransitioning = false;
+    }
+  });
+  gsap.to(camera, {
+    fov: 75,
+    duration: 1.0,
+    ease: 'power2.out',
+    onUpdate: () => camera.updateProjectionMatrix()
+  });
   updateCameraRotation();
   
   debugLog('🌟 RESPAWN', `Player ${localPlayerData?.n} respawn di [${spawnX}, ${spawnY}, ${spawnZ}]`);
@@ -702,17 +724,17 @@ async function initGameEngine(player) {
     loadText.textContent = t;
   };
 
-  setLoad(10, 'Menginisialisasi dunia...');
+  setLoad(10, 'Membuka gerbang dunia...');
   // Menghilangkan warning deprecation secara paksa dengan unbinding call
   const rapierInit = RAPIER.init;
   await rapierInit(); 
-  setLoad(30, 'Mengatur fisika...');
+  setLoad(30, 'Menyusun fisika pulau...');
 
   // Use RAPIER.Vector3 for gravity 
   physicsWorld = new RAPIER.World(new RAPIER.Vector3(0.0, -20.0, 0.0));
   Layers = { TERRAIN: 0x0001, STATIC: 0x0002, DYNAMIC: 0x0004, PLAYER: 0x0008, NPC: 0x0010, TRIGGER: 0x0020 };
 
-  setLoad(50, 'Menanam pohon-pohon...');
+  setLoad(50, 'Menanam pepohonan lucu...');
   // Player Physics — Menggunakan kordinat spawn khusus yang diminta
   let startX = 0, startY = 8, startZ = 0;
   if (player.n === 'Elfan') { startX = 3.3; startY = 5.6; startZ = -4.3; }
@@ -789,15 +811,15 @@ async function initGameEngine(player) {
   // Setup NPC Manager
   npcManager = new NPCManager({ getHeight: (x, z) => worldBuilder ? worldBuilder.getHeight(x, z) : 0 }, playerGroup);
 
-  setLoad(70, 'Membangun dunia...');
+  setLoad(70, 'Membangun dunia kecil kalian...');
   worldBuilder = new WorldBuilder(scene, gameGroup, interactables, RAPIER, physicsWorld, Layers);
   worldBuilder.npcManager = npcManager;
   npcManager.world = worldBuilder;
   await worldBuilder.build((progress) => {
-    setLoad(70 + progress * 0.2, `Membangun dunia... ${Math.floor(progress)}%`);
+    setLoad(70 + progress * 0.2, `Menyusun detail dunia... ${Math.floor(progress)}%`);
   });
 
-  setLoad(90, 'Menghitung bintang...');
+  setLoad(90, 'Menyalakan bintang-bintang...');
   // Camera Setup — Eye level disesuaikan dengan tinggi badan baru
   camera.position.set(0, 0.7, 0); 
   camera.rotation.set(0, 0, 0);
@@ -865,7 +887,7 @@ async function initGameEngine(player) {
   debugLog('🔍 AUDIT', `Audit selesai, diperiksa ${auditCount} objek.`);
 
   // ✅ Semua siap — selesaikan loading dan mulai game
-  setLoad(100, 'Selamat datang di dunia kalian! 🌸');
+  setLoad(100, 'Selamat datang di OurLittleWorld! 🌸');
   await new Promise(r => setTimeout(r, 600)); // brief moment to show 100%
 
   // Hide loading, show game
@@ -1551,7 +1573,7 @@ function updatePhysics(delta, time) {
   playerBody.setLinvel({ x: currentVel.x, y: verticalVelocity, z: currentVel.z }, true);
 
   // BUG 1 FIX: Camera Head Bob & FOV — tanpa cameraPivot
-  if (!isFreeCam) {
+  if (!isFreeCam && !isRespawnTransitioning) {
     const isSwim = (pTrans.y - 0.6) < 0.2;
     let bobAmp = 0;
     if (isGrounded && !isSwim && !isClimbing && moveDir.lengthSq() > 0.01) {
@@ -2093,12 +2115,6 @@ function setupUI() {
   };
   document.getElementById('btn-settings').onclick = () => document.getElementById('settings-panel').classList.remove('hidden');
   document.getElementById('btn-quit').onclick = () => location.reload();
-  document.getElementById('btn-membook').onclick = () => {
-    pauseMenu.classList.add('hidden');
-    document.getElementById('memory-book').classList.remove('hidden');
-  };
-  document.getElementById('btn-sharednote').onclick = document.getElementById('btn-membook').onclick;
-  document.getElementById('btn-wishbook').onclick = document.getElementById('btn-membook').onclick;
 
   // Carving dialog
   document.getElementById('btn-save-carve').onclick = saveCarving;
