@@ -9,28 +9,17 @@
 | Layer | Technology |
 |---|---|
 | Frontend | Vite + Three.js |
-| Backend | Node.js + Express + Socket.io |
+| Realtime | Supabase Realtime (Broadcast + Presence) |
 | Deploy Frontend | Vercel |
-| Deploy Backend | Railway |
 
 ---
 
 ## Cara Jalankan (Development)
 
-### 1. Backend
+### 1. Frontend
 
 ```bash
-cd backend
-npm install
-npm run dev
-```
-
-Server berjalan di `http://localhost:3001`
-
-### 2. Frontend
-
-```bash
-cd frontend
+cd coizy
 npm install
 npm run dev
 ```
@@ -98,22 +87,33 @@ litleworld/
 
 ## Deploy
 
-### Frontend → Vercel
+### Vercel (Vercel-only)
 
 ```bash
-cd frontend
-npm run build
-# Upload dist/ ke Vercel, atau connect GitHub repo
+# dari root project:
+# Vercel akan menjalankan:
+# buildCommand: cd coizy && npm install && npm run build
+# outputDirectory: coizy/dist
 ```
 
-Set environment variable di Vercel:
+Set environment variable di Vercel (Project Settings → Environment Variables):
 ```
-VITE_SERVER_URL=https://your-railway-backend.up.railway.app
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-anon-key>
+VITE_ENABLE_PAUSE_MENU=true
 ```
 
-### Backend → Railway
+Untuk local dev, buat file `coizy/.env` berisi variable yang sama.
 
-Connect GitHub repo, set root directory ke `backend/`, Railway auto-detect Node.js.
+Panduan detail setup realtime ada di `coizy/SUPABASE_SETUP.md`.
+
+### Checklist Verifikasi 2 Pemain
+
+- Buka game di 2 browser/device.
+- Pastikan pemain kedua muncul dan gerak sinkron realtime.
+- Uji interaksi bersama (`emote`, `door`, `flower`, `generator`).
+- Tutup salah satu client, pastikan peer menghilang dari client lain.
+- Uji kasus room penuh (maksimal 2 pemain).
 
 ---
 

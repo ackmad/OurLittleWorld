@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { HouseBuilder } from './HouseBuilder.js';
-import { createCatModel } from './CatModel.js';
-import { createRabbitModel } from './RabbitModel.js';
-import { createButterflyModel } from './ButterflyModel.js';
+import { createCatModel } from '../models/CatModel.js';
+import { createRabbitModel } from '../models/RabbitModel.js';
+import { createButterflyModel } from '../models/ButterflyModel.js';
 
 // ===========================
 //  COLOUR PALETTE — Brighter

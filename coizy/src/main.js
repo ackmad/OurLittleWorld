@@ -13,11 +13,11 @@ import { VignetteShader } from 'three/examples/jsm/shaders/VignetteShader.js';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import gsap from 'gsap';
-import { io } from 'socket.io-client';
-import { WorldBuilder } from './WorldBuilder.js';
-import { NPCManager } from './NPCManager.js';
+import { WorldBuilder } from './world/WorldBuilder.js';
+import { NPCManager } from './core/NPCManager.js';
 import * as RAPIER from '@dimforge/rapier3d-compat';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
+import { createRealtimeClient } from './network/realtimeClient.js';
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 5000);
 
@@ -51,7 +51,14 @@ let isPointerLocked = false;
 const MOUSE_SENSITIVITY = 0.002;
 
 // === PERBAIKAN 3: SISTEM DEBUG ===
-const DEBUG_MODE = true;
+const DEBUG_MODE = import.meta.env.DEV && import.meta.env.VITE_DEBUG_LOGS === 'true';
+const MAX_RENDER_DPR = Number(import.meta.env.VITE_MAX_RENDER_DPR || 0.75);
+const NETWORK_EMIT_INTERVAL_MS = Number(import.meta.env.VITE_NET_EMIT_MS || 66);
+const NETWORK_HEARTBEAT_MS = Number(import.meta.env.VITE_NET_HEARTBEAT_MS || 400);
+const SKY_FOLLOW_INTERVAL_MS = Number(import.meta.env.VITE_SKY_FOLLOW_MS || 120);
+const SKY_FOLLOW_TMP = new THREE.Vector3();
+const LOW_POWER_MODE = import.meta.env.VITE_LOW_POWER_MODE === 'true';
+let lastSkyFollowT = 0;
 const lastLogMessage = new Map();
 function debugLog(kategori, pesan, data = null) {
   if (!DEBUG_MODE) return;
@@ -101,10 +108,11 @@ if (window._coizyLabelRenderer) {
   }
 }
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+const enableAA = !LOW_POWER_MODE;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: enableAA, powerPreference: "high-performance" });
 window._coizyRenderer = renderer;
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.8));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_RENDER_DPR));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -534,10 +542,17 @@ function animate() {
   const time = performance.now();
   const rawDelta = (time - lastT) / 1000;
   const delta = Math.min(rawDelta, 0.05);
+  const isHiddenTab = document.hidden;
 
   if (!inGame) {
     lobbyGroup.position.y = -10 + Math.sin(time * 0.001) * 1;
     lobbyGroup.rotation.y = time * 0.0001;
+  }
+
+  // Saat tab tidak aktif, skip update/render berat untuk mengurangi beban CPU/GPU.
+  if (isHiddenTab) {
+    lastT = time;
+    return;
   }
 
   if (inGame && playerBody && physicsWorld) {
@@ -579,10 +594,10 @@ function animate() {
 
   // Pastikan Sky Dome selalu mengikuti posisi camera agar tidak pernah ter-clip
   // Pastikan Sky Dome selalu mengikuti posisi camera (Global)
-  if (window._skyMesh) {
-    const worldPos = new THREE.Vector3();
-    camera.getWorldPosition(worldPos);
-    window._skyMesh.position.copy(worldPos);
+  if (window._skyMesh && (time - lastSkyFollowT > SKY_FOLLOW_INTERVAL_MS)) {
+    lastSkyFollowT = time;
+    camera.getWorldPosition(SKY_FOLLOW_TMP);
+    window._skyMesh.position.copy(SKY_FOLLOW_TMP);
   }
 
   // ====== LEAF PARTICLES ANIMATION ======
@@ -1628,7 +1643,7 @@ function updatePhysics(delta, time) {
   }
 
   // EMIT posisi — hanya kirim jika ada perubahan bermakna (untuk kurangi jitter)
-  if (socket && socket.connected && inGame && playerBody && time - lastEmitT > 50) {
+  if (socket && socket.connected && inGame && playerBody && time - lastEmitT > NETWORK_EMIT_INTERVAL_MS) {
     const pos = playerGroup.position;
     const isMoving = !!(moveState.w || moveState.a || moveState.s || moveState.d);
     const normalizedRy = ((cameraYaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -1638,13 +1653,18 @@ function updatePhysics(delta, time) {
     const lastR = socket._lastR || 0;
     const distSq = (pos.x - lastP.x)**2 + (pos.y - lastP.y)**2 + (pos.z - lastP.z)**2;
     const rotDiff = Math.abs(normalizedRy - lastR);
-    const forceEmit = (time - lastEmitT) > 333; // Heartbeat setiap 333ms meski diam
+    const forceEmit = (time - lastEmitT) > NETWORK_HEARTBEAT_MS; // Heartbeat saat idle
 
     if (distSq > 0.0001 || rotDiff > 0.02 || isMoving || forceEmit) {
+      // Quantize tipis untuk menekan ukuran payload dan jitter mikro.
+      const qx = Math.round(pos.x * 1000) / 1000;
+      const qy = Math.round(pos.y * 1000) / 1000;
+      const qz = Math.round(pos.z * 1000) / 1000;
+      const qry = Math.round(normalizedRy * 1000) / 1000;
       lastEmitT = time;
-      socket._lastP = { x: pos.x, y: pos.y, z: pos.z };
-      socket._lastR = normalizedRy;
-      socket.emit('player_move', { x: pos.x, y: pos.y, z: pos.z, ry: normalizedRy, moving: isMoving });
+      socket._lastP = { x: qx, y: qy, z: qz };
+      socket._lastR = qry;
+      socket.emit('player_move', { x: qx, y: qy, z: qz, ry: qry, moving: isMoving });
     }
   }
 
@@ -1833,9 +1853,10 @@ function initNetwork(playerName, playerColor) {
     }
     Object.keys(peers).forEach(id => removePeer(id));
 
-    // Buat koneksi baru dan biarkan auto-reconnect aktif untuk menangani Vite HMR/network drops
-    socket = io('http://localhost:3001', {
-      reconnection: true
+    // Koneksi realtime provider (Supabase) untuk deploy Vercel-only.
+    socket = createRealtimeClient({
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
     });
     window._coizySocket = socket;
     window._coizyPeers = peers;

@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "name": "our-little-world",
+  "installCommand": "npm install",
+  "buildCommand": "cd coizy && npm install && npm run build",
+  "outputDirectory": "coizy/dist"
+}
